@@ -37,7 +37,22 @@ jobs:
           node-version: 22
 
       - name: Instalar Dependências
-        run: npm install --legacy-peer-deps
+        shell: bash
+        run: |
+          # Remove package-lock.json gerado em outro OS para evitar o bug do npm (#4828) que omite binários nativos do Rolldown
+          rm -f package-lock.json
+          npm install --legacy-peer-deps
+
+      - name: Garantir Binários Nativos da Plataforma (Vite/Rolldown)
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            npm install --no-save @rolldown/binding-win32-x64-msvc@1.2.15 || true
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            npm install --no-save @rolldown/binding-darwin-arm64@1.2.15 @rolldown/binding-darwin-x64@1.2.15 || true
+          elif [ "${{ runner.os }}" = "Linux" ]; then
+            npm install --no-save @rolldown/binding-linux-x64-gnu@1.2.15 || true
+          fi
 
       - name: Compilar Frontend (Vite)
         run: npm run build
