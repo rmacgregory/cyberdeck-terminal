@@ -14,7 +14,7 @@
 
 O **Cyberdeck CRT Terminal** é um ambiente de terminal completo que une o visual nostálgico dos monitores de fósforo verde/âmbar com recursos modernos de produtividade, gerenciamento de servidores e rede.
 
-Disponível tanto como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macOS) quanto como **SPA Web portátil** e **arquivo HTML autônomo offline**.
+Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macOS), **aplicativo nativo Android APK para Tablets** (via Capacitor), **SPA Web portátil** e **arquivo HTML autônomo offline**.
 
 ---
 
@@ -84,6 +84,9 @@ Acesse a aba [**Releases**](https://github.com/rmacgregory/cyberdeck-terminal/re
 | 🪟 **Windows** (64-bit) | `.exe` (Portable) | Executável único portátil |
 | 🐧 **Linux** (64-bit) | `.AppImage` | Portátil para Ubuntu, Debian, Fedora, Arch, etc. (`chmod +x` e rodar) |
 | 🍎 **macOS** (Universal) | `.dmg` / `.zip` | Imagem de disco instalável para Mac (Intel & Apple Silicon) |
+| 📱 **Android** (Tablet/Mobile) | `.apk` | Pacote nativo único para instalação direta no seu tablet Android |
+
+Consulte o [**Guia de Uso no Android (COMO-RODAR-NO-ANDROID.md)**](./COMO-RODAR-NO-ANDROID.md) para detalhes completos de instalação no tablet e compilação do APK.
 
 ---
 

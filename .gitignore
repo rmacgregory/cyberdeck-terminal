@@ -12,3 +12,15 @@ release/
 *.deb
 *.dmg
 *.zip
+*.apk
+*.aab
+release-android/
+
+# Android build & Gradle caches
+.gradle/
+android/.gradle/
+android/build/
+android/app/build/
+android/.idea/
+android/captures/
+

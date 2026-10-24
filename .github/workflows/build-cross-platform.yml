@@ -88,9 +88,59 @@ jobs:
             release/*.zip
           if-no-files-found: warn
 
+  android:
+    name: Build para Android (.apk)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar Dependências
+        shell: bash
+        run: |
+          rm -f package-lock.json
+          npm install --legacy-peer-deps
+
+      - name: Compilar Frontend (Vite)
+        run: npm run build
+
+      - name: Sincronizar Capacitor com Android
+        run: npx cap sync android
+
+      - name: Permissão de execução para o Gradle
+        run: chmod +x android/gradlew
+
+      - name: Compilar APK Debug
+        run: |
+          cd android
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Organizar APK para Artefatos
+        run: |
+          mkdir -p release-android
+          cp android/app/build/outputs/apk/debug/app-debug.apk release-android/Cyberdeck-Terminal-Android-debug.apk
+
+      - name: Salvar Artefatos Compilados (Android APK)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cyberdeck-Android-APK
+          path: release-android/*.apk
+          if-no-files-found: warn
+
   release:
     name: Publicar Release no GitHub
-    needs: build
+    needs: [build, android]
     if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release != 'false')
     runs-on: ubuntu-latest
     steps:
@@ -119,7 +169,7 @@ jobs:
       - name: Organizar e listar binários prontos
         run: |
           mkdir -p dist-releases
-          find all-releases -type f \( -name "*.exe" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.zip" \) -exec cp {} dist-releases/ \;
+          find all-releases -type f \( -name "*.exe" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.zip" -o -name "*.apk" \) -exec cp {} dist-releases/ \;
           echo "=== Arquivos prontos para o Release ==="
           ls -lh dist-releases/
 
@@ -134,3 +184,4 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

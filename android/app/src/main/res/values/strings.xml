@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cyberdeck CRT Terminal</string>
+    <string name="title_activity_main">Cyberdeck CRT Terminal</string>
+    <string name="package_name">com.cyberdeck.crtterminal</string>
+    <string name="custom_url_scheme">com.cyberdeck.crtterminal</string>
+</resources>

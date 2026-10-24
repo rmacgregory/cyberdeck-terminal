@@ -1,0 +1,13 @@
+{
+	"appId": "com.cyberdeck.crtterminal",
+	"appName": "Cyberdeck CRT Terminal",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https",
+		"cleartext": true
+	},
+	"android": {
+		"allowMixedContent": true,
+		"backgroundColor": "#050a05"
+	}
+}

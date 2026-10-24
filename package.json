@@ -17,10 +17,15 @@
     "package:linux": "vite build && electron-builder --linux",
     "package:mac": "vite build && electron-builder --mac",
     "package:all": "vite build && electron-builder -wlm",
+    "cap:sync": "cap sync",
+    "cap:build": "vite build && cap sync android",
+    "cap:open": "cap open android",
+    "build:android": "vite build && cap sync android && cd android && ./gradlew assembleDebug",
     "clean": "rm -rf dist server.js release",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.3",
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
@@ -35,6 +40,8 @@
     "ws": "^8.22.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",

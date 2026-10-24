@@ -1582,7 +1582,7 @@ export default function App() {
 
       {/* Bottom Hardware Footer */}
       <footer className="mt-2 pt-1 border-t border-zinc-900 flex flex-wrap items-center justify-between text-[10px] opacity-65 tracking-widest font-mono shrink-0">
-        <div>TERMINAL: WINDOWS x64 // MULTI-TAB ENGINE // ABA: {currentTab.title}</div>
+        <div>TERMINAL: CROSS-PLATFORM // WIN • LINUX • MAC • ANDROID // ABA: {currentTab.title}</div>
         <div>PROTOCOLS: POWERSHELL • SSH • TELNET • ICMP • RAW TCP</div>
         <div>ABAS ATIVAS: {tabs.length}</div>
       </footer>
