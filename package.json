@@ -55,6 +55,7 @@
       "output": "release"
     },
     "asar": false,
+    "npmRebuild": false,
     "publish": null,
     "files": [
       "dist/**/*",
@@ -65,17 +66,31 @@
     ],
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "signExecutable": false
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Cyberdeck CRT Terminal"
+      "shortcutName": "Cyberdeck CRT Terminal",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}.${ext}"
     },
     "linux": {
       "target": [
@@ -91,11 +106,15 @@
         "zip"
       ],
       "category": "public.app-category.developer-tools",
-      "artifactName": "${productName}-${version}.${ext}",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "identity": null,
       "forceCodeSigning": false
+    },
+    "dmg": {
+      "format": "UDZO",
+      "sign": false
     }
   }
 }

@@ -19,7 +19,7 @@ jobs:
         include:
           - os: windows-latest
             os-name: Windows (.exe)
-            builder-args: --win
+            builder-args: --win --x64
           - os: ubuntu-latest
             os-name: Linux (.AppImage)
             builder-args: --linux AppImage
@@ -42,10 +42,15 @@ jobs:
       - name: Compilar Frontend (Vite)
         run: npm run build
 
+      - name: Limpar atributos estendidos (macOS)
+        if: runner.os == 'macOS'
+        run: xattr -cr . || true
+
       - name: Compilar Aplicativo Desktop (${{ matrix.os-name }})
         env:
           # Desativa a busca obrigatória por certificados pagos (Apple/Microsoft) para compilar sem erros de assinatura
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          DEBUG: electron-builder
         run: npx electron-builder ${{ matrix.builder-args }} --publish never
 
       - name: Salvar Artefatos Compilados
