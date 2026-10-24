@@ -1,10 +1,19 @@
 name: Build Cross-Platform Cyberdeck
 
 on:
-  workflow_dispatch: # Permite disparar manualmente pelo botão "Run workflow" no GitHub
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Publicar Release no GitHub?'
+        type: boolean
+        default: true
+      tag_name:
+        description: 'Tag da versão (ex: v1.0.0)'
+        required: false
+        default: 'v1.0.0'
   push:
     tags:
-      - 'v*' # Dispara automaticamente ao criar uma tag de versão (ex: git tag v1.0.0 && git push --tags)
+      - 'v*'
 
 permissions:
   contents: write
@@ -80,23 +89,46 @@ jobs:
           if-no-files-found: warn
 
   release:
-    name: Criar Release no GitHub (Tags)
+    name: Publicar Release no GitHub
     needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release != 'false')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout do Repositório
         uses: actions/checkout@v4
+
+      - name: Determinar Tag do Release
+        id: release_info
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag_name }}"
+            if [ -z "$TAG" ]; then
+              TAG="v1.0.${{ github.run_number }}"
+            fi
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Tag definida: $TAG"
 
       - name: Baixar todos os artefatos compilados
         uses: actions/download-artifact@v4
         with:
           path: all-releases
 
+      - name: Organizar e listar binários prontos
+        run: |
+          mkdir -p dist-releases
+          find all-releases -type f \( -name "*.exe" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.zip" \) -exec cp {} dist-releases/ \;
+          echo "=== Arquivos prontos para o Release ==="
+          ls -lh dist-releases/
+
       - name: Publicar Release no GitHub com Binários
         uses: softprops/action-gh-release@v2
         with:
-          files: all-releases/**/*
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          name: Cyberdeck Terminal ${{ steps.release_info.outputs.tag }}
+          files: dist-releases/*
           draft: false
           prerelease: false
           generate_release_notes: true
