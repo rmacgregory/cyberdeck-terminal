@@ -1,0 +1,84 @@
+name: Build Cross-Platform Cyberdeck
+
+on:
+  workflow_dispatch: # Permite disparar manualmente pelo botão "Run workflow" no GitHub
+  push:
+    tags:
+      - 'v*' # Dispara automaticamente ao criar uma tag de versão (ex: git tag v1.0.0 && git push --tags)
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build para ${{ matrix.os-name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            os-name: Windows (.exe)
+            builder-args: --win
+          - os: ubuntu-latest
+            os-name: Linux (.AppImage)
+            builder-args: --linux AppImage
+          - os: macos-latest
+            os-name: macOS (.dmg / .zip)
+            builder-args: --mac
+
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar Dependências
+        run: npm install --legacy-peer-deps
+
+      - name: Compilar Frontend (Vite)
+        run: npm run build
+
+      - name: Compilar Aplicativo Desktop (${{ matrix.os-name }})
+        env:
+          # Desativa a busca obrigatória por certificados pagos (Apple/Microsoft) para compilar sem erros de assinatura
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npx electron-builder ${{ matrix.builder-args }} --publish never
+
+      - name: Salvar Artefatos Compilados
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cyberdeck-${{ matrix.os }}
+          path: |
+            release/*.exe
+            release/*.AppImage
+            release/*.dmg
+            release/*.zip
+          if-no-files-found: warn
+
+  release:
+    name: Criar Release no GitHub (Tags)
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Baixar todos os artefatos compilados
+        uses: actions/download-artifact@v4
+        with:
+          path: all-releases
+
+      - name: Publicar Release no GitHub com Binários
+        uses: softprops/action-gh-release@v2
+        with:
+          files: all-releases/**/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

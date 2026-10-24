@@ -1,0 +1,429 @@
+@import "tailwindcss";
+
+:root {
+  --term-font: 'Share Tech Mono', monospace;
+  --title-font: 'VT323', monospace;
+  
+  /* Default Theme: Matrix Green Phosphor */
+  --glow-color: #00ff66;
+  --glow-color-dim: #008f39;
+  --glow-color-bg: rgba(0, 255, 102, 0.08);
+  --term-bg: #030a05;
+  --panel-border: rgba(0, 255, 102, 0.35);
+  --scanline-opacity: 0.28;
+}
+
+[data-theme="amber"] {
+  --glow-color: #ffb000;
+  --glow-color-dim: #aa7500;
+  --glow-color-bg: rgba(255, 176, 0, 0.08);
+  --term-bg: #0d0801;
+  --panel-border: rgba(255, 176, 0, 0.35);
+}
+
+[data-theme="cyan"] {
+  --glow-color: #00f0ff;
+  --glow-color-dim: #008899;
+  --glow-color-bg: rgba(0, 240, 255, 0.08);
+  --term-bg: #010c10;
+  --panel-border: rgba(0, 240, 255, 0.35);
+}
+
+[data-theme="magenta"] {
+  --glow-color: #ff0077;
+  --glow-color-dim: #990047;
+  --glow-color-bg: rgba(255, 0, 119, 0.08);
+  --term-bg: #0f0108;
+  --panel-border: rgba(255, 0, 119, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--term-font);
+  color: var(--glow-color);
+  background-color: #020406;
+}
+
+.font-vt323 {
+  font-family: var(--title-font);
+}
+
+.font-share-tech {
+  font-family: 'Share Tech Mono', monospace;
+}
+
+.font-fira-code {
+  font-family: 'Fira Code', monospace;
+}
+
+.font-jetbrains {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Terminal Font Sizes */
+.term-size-sm {
+  font-size: 0.8rem;
+}
+
+.term-size-md {
+  font-size: 0.925rem;
+}
+
+.term-size-lg {
+  font-size: 1.125rem;
+}
+
+/* Optical scale compensation for VT323 pixel font */
+.font-vt323.term-size-sm,
+.font-vt323 .term-size-sm {
+  font-size: 1.05rem;
+}
+
+.font-vt323.term-size-md,
+.font-vt323 .term-size-md {
+  font-size: 1.25rem;
+}
+
+.font-vt323.term-size-lg,
+.font-vt323 .term-size-lg {
+  font-size: 1.5rem;
+}
+
+/* Terminal Line Spacing */
+.term-space-tight {
+  line-height: 1.25;
+}
+
+.term-space-normal {
+  line-height: 1.55;
+}
+
+.term-space-loose {
+  line-height: 1.95;
+}
+
+/* Base CRT Monitor & Vignette */
+.crt-monitor {
+  position: relative;
+  background: radial-gradient(circle at center, rgba(16, 24, 20, 0.94) 0%, rgba(2, 4, 3, 0.99) 90%);
+  box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.95), 0 0 40px rgba(0, 0, 0, 0.8);
+  transition: all 0.3s ease;
+}
+
+.crt-screen-curved {
+  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.85),
+              inset 0 0 40px var(--glow-color-bg);
+  border-radius: 12px;
+}
+
+/* ==========================================================================
+   AUTHENTIC VINTAGE CRT MONITOR (Cool-Retro-Term Style - image_42a73025.png)
+   ========================================================================== */
+
+/* Physical Outer Bezel Chassis (The heavy plastic/metal casing of the CRT monitor) */
+.crt-real-chassis {
+  background: linear-gradient(145deg, #1f2327 0%, #131518 50%, #0d0f11 100%);
+  border-radius: 28px;
+  padding: 12px 14px 16px 14px;
+  box-shadow:
+    0 25px 60px -15px rgba(0, 0, 0, 0.95),
+    0 0 0 2px #2a2e33,
+    inset 0 2px 3px rgba(255, 255, 255, 0.18),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.85);
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+@media (max-width: 640px) {
+  .crt-real-chassis {
+    padding: 6px 6px 8px 6px;
+    border-radius: 16px;
+  }
+}
+
+/* Recessed Bezel Groove right around the glass tube */
+.crt-bezel-recess {
+  background: #08090b;
+  border-radius: 22px;
+  padding: 3px;
+  box-shadow:
+    inset 0 4px 12px rgba(0, 0, 0, 0.95),
+    inset 0 -2px 6px rgba(255, 255, 255, 0.05),
+    0 1px 0 rgba(255, 255, 255, 0.08);
+  position: relative;
+}
+
+@media (max-width: 640px) {
+  .crt-bezel-recess {
+    border-radius: 12px;
+    padding: 2px;
+  }
+}
+
+/* The Curved Glass Tube (Cathode Ray Tube bulb) */
+.crt-real-screen {
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  background: radial-gradient(
+    ellipse 95% 85% at 50% 50%,
+    rgba(10, 32, 20, 0.45) 0%,
+    rgba(4, 16, 9, 0.82) 65%,
+    rgba(1, 6, 3, 0.98) 95%,
+    #000301 100%
+  );
+  box-shadow:
+    inset 0 0 100px rgba(0, 0, 0, 0.96),
+    inset 0 0 35px var(--glow-color-bg),
+    inset 0 2px 4px rgba(255, 255, 255, 0.12),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.9);
+  transition: all 0.3s ease;
+}
+
+body[data-theme="amber"] .crt-real-screen {
+  background: radial-gradient(
+    ellipse 95% 85% at 50% 50%,
+    rgba(32, 22, 6, 0.45) 0%,
+    rgba(18, 11, 2, 0.82) 65%,
+    rgba(6, 3, 1, 0.98) 95%,
+    #030200 100%
+  );
+}
+
+body[data-theme="cyan"] .crt-real-screen {
+  background: radial-gradient(
+    ellipse 95% 85% at 50% 50%,
+    rgba(6, 26, 32, 0.45) 0%,
+    rgba(2, 13, 18, 0.82) 65%,
+    rgba(1, 4, 6, 0.98) 95%,
+    #000203 100%
+  );
+}
+
+body[data-theme="magenta"] .crt-real-screen {
+  background: radial-gradient(
+    ellipse 95% 85% at 50% 50%,
+    rgba(32, 6, 22, 0.45) 0%,
+    rgba(18, 2, 13, 0.82) 65%,
+    rgba(6, 1, 4, 0.98) 95%,
+    #030002 100%
+  );
+}
+
+@media (max-width: 640px) {
+  .crt-real-screen {
+    border-radius: 10px;
+  }
+}
+
+/* Barrel Distortion / Spherical Curvature Effect */
+.crt-barrel-warp {
+  transform: perspective(1200px) scale(0.992);
+  transform-origin: center center;
+}
+
+/* CRT Heavy Raster Scanlines */
+.crt-scanlines-real {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 1.5px,
+    rgba(0, 0, 0, 0.48) 1.5px,
+    rgba(0, 0, 0, 0.48) 3px
+  );
+  mix-blend-mode: multiply;
+}
+
+/* CRT Aperture Grille / Shadow Mask (Subpixel RGB Phosphor Columns) */
+.crt-aperture-grille {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 26;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 0, 0, 0.03) 0px,
+    rgba(255, 0, 0, 0.03) 1px,
+    rgba(0, 255, 0, 0.02) 1px,
+    rgba(0, 255, 0, 0.02) 2px,
+    rgba(0, 0, 255, 0.03) 2px,
+    rgba(0, 0, 255, 0.03) 3px
+  );
+  mix-blend-mode: overlay;
+}
+
+/* CRT Curved Glass Glare & Reflection (Soft ambient overhead light on convex bulb) */
+.crt-glass-glare {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 27;
+  background: radial-gradient(
+    ellipse 85% 35% at 50% 2%,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.03) 45%,
+    transparent 80%
+  );
+}
+
+/* Corner Vignette Overlay */
+.crt-vignette-layer {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 28;
+  background: radial-gradient(
+    ellipse 80% 75% at 50% 50%,
+    transparent 60%,
+    rgba(0, 0, 0, 0.65) 88%,
+    rgba(0, 0, 0, 0.95) 100%
+  );
+}
+
+/* Subtle Cathode Ray Refresh Bar Sweep */
+@keyframes crt-roll {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(1000%); }
+}
+
+.crt-refresh-bar {
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 12px;
+  z-index: 29;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    transparent 100%
+  );
+  animation: crt-roll 10s linear infinite;
+  opacity: 0.7;
+}
+
+/* Phosphor Bloom (High Luminescence text glow like in image_42a73025.png) */
+.crt-bloom-real {
+  color: var(--glow-color) !important;
+  text-shadow:
+    0 0 1px #ffffff,
+    0 0 4px var(--glow-color),
+    0 0 10px var(--glow-color),
+    0 0 22px var(--glow-color-dim),
+    0 0 35px rgba(0, 255, 102, 0.25);
+}
+
+/* Extreme Phosphor Bloom */
+.crt-bloom-extreme {
+  color: #ffffff !important;
+  text-shadow:
+    0 0 1px #ffffff,
+    0 0 3px #ffffff,
+    0 0 8px var(--glow-color),
+    0 0 16px var(--glow-color),
+    0 0 30px var(--glow-color),
+    0 0 50px var(--glow-color-dim);
+}
+
+/* Blinding Phosphor Highlight Block (e.g., Progress bars, selected list items, status tags) */
+.crt-phosphor-block {
+  background-color: var(--glow-color) !important;
+  color: #011406 !important;
+  font-weight: 900 !important;
+  box-shadow:
+    0 0 8px var(--glow-color),
+    0 0 22px var(--glow-color),
+    0 0 40px var(--glow-color-dim) !important;
+}
+
+/* Subtle CRT scanline overlay (used in subtle flat mode) */
+.crt-overlay {
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 50;
+  background: linear-gradient(
+    to bottom,
+    rgba(255,255,255,0),
+    rgba(255,255,255,0) 50%,
+    rgba(0, 0, 0, var(--scanline-opacity)) 51%,
+    rgba(0, 0, 0, var(--scanline-opacity))
+  );
+  background-size: 100% 4px;
+  mix-blend-mode: overlay;
+}
+
+/* CRT Phosphor Glow & Flicker */
+.crt-glow {
+  text-shadow: 0 0 5px var(--glow-color), 0 0 12px var(--glow-color-dim);
+}
+
+.crt-glow-box {
+  box-shadow: 0 0 15px var(--glow-color-bg), inset 0 0 10px var(--glow-color-bg);
+  border-color: var(--panel-border);
+}
+
+@keyframes crt-flicker {
+  0% { opacity: 0.985; }
+  50% { opacity: 1; }
+  52% { opacity: 0.94; }
+  54% { opacity: 1; }
+  80% { opacity: 0.98; }
+  100% { opacity: 0.995; }
+}
+
+.flicker-active {
+  animation: crt-flicker 0.15s infinite;
+}
+
+/* Custom Terminal Scrollbar */
+.cyber-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.cyber-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.7);
+}
+.cyber-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--glow-color-dim);
+  border-radius: 3px;
+}
+.cyber-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--glow-color);
+}
+
+/* Terminal Cursor */
+@keyframes cursor-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.term-cursor {
+  display: inline-block;
+  width: 9px;
+  height: 1.15em;
+  vertical-align: sub;
+  background-color: var(--glow-color);
+  box-shadow: 0 0 8px var(--glow-color), 0 0 16px var(--glow-color);
+  animation: cursor-blink 0.9s infinite;
+}
+
+/* Terminal Output line styles */
+.line-stdout { color: var(--glow-color); }
+.line-dim { color: var(--glow-color-dim); }
+.line-error { color: #ff4d61; text-shadow: 0 0 6px rgba(255, 77, 97, 0.6); }
+.line-warning { color: #ffbb00; text-shadow: 0 0 6px rgba(255, 187, 0, 0.6); }
+.line-info { color: #00d9ff; text-shadow: 0 0 6px rgba(0, 217, 255, 0.6); }
+.line-success { color: #22ff88; text-shadow: 0 0 8px rgba(34, 255, 136, 0.6); }
+.line-cmd { color: #ffffff; font-weight: bold; }

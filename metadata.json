@@ -1,0 +1,6 @@
+{
+  "name": "Cyberdeck Windows Terminal",
+  "description": "Frontend CRT Cyberpunk para Terminal Windows Real com suporte a PowerShell, CMD, SSH, Telnet, conexões rápidas personalizáveis e log em tempo real.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
