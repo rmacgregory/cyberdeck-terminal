@@ -919,9 +919,13 @@ export default function App() {
     }
 
     if (cmd === 'systeminfo') {
+      const isDesktop = typeof window !== 'undefined' && (window as any).cyberdeckDesktop?.isElectron;
+      const arch = isDesktop && (window as any).cyberdeckDesktop?.arch
+        ? `${(window as any).cyberdeckDesktop.arch} (64-bit Nativo Desktop)`
+        : 'x64 (Browser / V8 Engine)';
       appendLine(`Nome do Host:                      ${currentUsername}-CYBERDECK`, 'stdout');
       appendLine(`Nome do SO:                        ${systemInfoLabel}`, 'stdout');
-      appendLine(`Plataforma:                        ${detectedPlatform}`, 'stdout');
+      appendLine(`Plataforma / Arquitetura:          ${detectedPlatform} / ${arch}`, 'success');
       appendLine(`Interpretador Shell Atual:         ${shellType.toUpperCase()}`, 'stdout');
       appendLine(`Diretório Atual:                   ${currentPath}`, 'stdout');
       appendLine(`Backend:                           ${backendConnected ? 'Conectado (ws://127.0.0.1:3001)' : 'Offline / Standalone'}`, 'stdout');
