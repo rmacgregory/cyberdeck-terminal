@@ -44,7 +44,7 @@ npm run cap:build
 # 2. Abrir o projeto no Android Studio (para rodar no emulador ou depurar via USB)
 npm run cap:open
 
-# 3. Ou compilar diretamente o APK pelo terminal (requer Java 17+ instalado):
+# 3. Ou compilar diretamente o APK pelo terminal (requer Java 21+ instalado):
 npm run build:android
 ```
 O `.apk` gerado ficará em:

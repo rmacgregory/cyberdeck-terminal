@@ -95,11 +95,11 @@ jobs:
       - name: Checkout do Repositório
         uses: actions/checkout@v4
 
-      - name: Configurar Java 17
+      - name: Configurar Java 21 (Requisito Capacitor 8 / Android SDK 36)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Configurar Node.js
         uses: actions/setup-node@v4
