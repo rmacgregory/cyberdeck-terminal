@@ -59,3 +59,23 @@ export interface TypographyConfig {
   spacing: TerminalLineSpacing;
 }
 
+export interface TerminalTab {
+  id: string;
+  title: string;
+  protocol: 'LOCAL' | 'SSH' | 'TELNET' | 'PING' | 'RAW';
+  target?: string;
+  sessionState: SessionState;
+  remoteSessionName: string;
+  shellType: string;
+  currentPath: string;
+  currentUsername: string;
+  lines: TerminalLine[];
+  inputValue: string;
+  history: string[];
+  historyIndex: number;
+  pendingSsh: { host: string; port: number; user: string } | null;
+  isPasswordInput: boolean;
+  backendConnected: boolean;
+  hasUnread?: boolean;
+}
+

@@ -1,10 +1,11 @@
 import React from 'react';
 import { QuickSession } from '../types';
-import { Layers, Plus, Trash2, Play, Terminal } from 'lucide-react';
+import { Layers, Plus, Trash2, Play, Terminal, ExternalLink } from 'lucide-react';
 
 interface QuickSessionsPanelProps {
   sessions: QuickSession[];
   onSelectSession: (session: QuickSession) => void;
+  onSelectSessionInNewTab?: (session: QuickSession) => void;
   onOpenAddModal: () => void;
   onDeleteSession: (id: string) => void;
 }
@@ -12,6 +13,7 @@ interface QuickSessionsPanelProps {
 export const QuickSessionsPanel: React.FC<QuickSessionsPanelProps> = ({
   sessions,
   onSelectSession,
+  onSelectSessionInNewTab,
   onOpenAddModal,
   onDeleteSession,
 }) => {
@@ -83,10 +85,19 @@ export const QuickSessionsPanel: React.FC<QuickSessionsPanelProps> = ({
                 <button
                   onClick={() => onSelectSession(item)}
                   className="p-1 rounded text-emerald-400 hover:bg-emerald-900/50 transition-colors"
-                  title="Conectar no terminal"
+                  title="Conectar na aba atual"
                 >
                   <Play className="w-3 h-3 fill-current" />
                 </button>
+                {onSelectSessionInNewTab && (
+                  <button
+                    onClick={() => onSelectSessionInNewTab(item)}
+                    className="p-1 rounded text-cyan-400 hover:bg-cyan-950/40 transition-colors"
+                    title="Conectar em NOVA ABA"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                )}
                 <button
                   onClick={() => onDeleteSession(item.id)}
                   className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"

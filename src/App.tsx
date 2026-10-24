@@ -15,9 +15,11 @@ import {
   TerminalFontSize,
   TerminalLineSpacing,
   TerminalFontFamily,
+  TerminalTab,
 } from './types';
 import { RetroAudioEngine } from './utils/audio';
 import { HeaderHud } from './components/HeaderHud';
+import { TerminalTabsBar } from './components/TerminalTabsBar';
 import { TerminalScreen } from './components/TerminalScreen';
 import { QuickSessionsPanel } from './components/QuickSessionsPanel';
 import { ConnectionLogsPanel } from './components/ConnectionLogsPanel';
@@ -72,17 +74,11 @@ export default function App() {
   const [sfxEnabled, setSfxEnabled] = useState<boolean>(true);
   const [mobileTab, setMobileTab] = useState<'terminal' | 'sessions' | 'logs'>('terminal');
 
-  // Integrated Cyber-Net Web Browser
+  // Integrated Cyber-Net Web Browser (Alpha)
   const [isBrowserOpen, setIsBrowserOpen] = useState<boolean>(false);
   const [browserInitialUrl, setBrowserInitialUrl] = useState<string>('cyberdeck://home');
 
-  // Terminal Lines
-  const [lines, setLines] = useState<TerminalLine[]>([]);
-  const [inputValue, setInputValue] = useState<string>('');
-  const [history, setHistory] = useState<string[]>([]);
-  const [historyIndex, setHistoryIndex] = useState<number>(-1);
-
-  // Platform & Shell State
+  // Platform State
   const [detectedPlatform, setDetectedPlatform] = useState<string>(() => {
     if (typeof window !== 'undefined' && (window as any).cyberdeckDesktop?.platform) {
       return (window as any).cyberdeckDesktop.platform;
@@ -95,32 +91,94 @@ export default function App() {
     }
     return 'win32';
   });
-  const [currentUsername, setCurrentUsername] = useState<string>('User');
-  const [systemInfoLabel, setSystemInfoLabel] = useState<string>('Local Host');
-  const [shellType, setShellType] = useState<string>(() => {
+
+  const defaultShell = (() => {
     if (typeof window !== 'undefined' && (window as any).cyberdeckDesktop?.platform === 'darwin') return 'zsh';
     if (typeof window !== 'undefined' && (window as any).cyberdeckDesktop?.platform === 'linux') return 'bash';
     return 'powershell';
-  });
-  const [currentPath, setCurrentPath] = useState<string>(() => {
+  })();
+
+  const defaultPath = (() => {
     if (typeof navigator !== 'undefined' && (navigator.userAgent.includes('Mac') || navigator.userAgent.includes('Linux'))) {
       return '~';
     }
     return 'C:\\Users\\Admin';
-  });
-  const [sessionState, setSessionState] = useState<SessionState>('local_shell');
-  const [remoteSessionName, setRemoteSessionName] = useState<string>('');
-  const [pendingSsh, setPendingSsh] = useState<{ host: string; port: number; user: string } | null>(null);
-  const [isPasswordInput, setIsPasswordInput] = useState<boolean>(false);
+  })();
 
-  // Backend Connection (Node.js WebSocket / Socket Bridge)
+  const [systemInfoLabel, setSystemInfoLabel] = useState<string>('Local Host');
+
+  // Backend URL (Node.js WebSocket Server)
   const [backendUrl, setBackendUrl] = useState<string>(() => {
     return localStorage.getItem('CYBERDECK_BACKEND_URL') || 'ws://127.0.0.1:3001';
   });
-  const [backendConnected, setBackendConnected] = useState<boolean>(false);
-  const wsRef = useRef<WebSocket | null>(null);
 
-  // Saved Quick Sessions (0 initially as requested - only user-added sessions exist)
+  // Dedicated WebSockets per Tab for simultaneous concurrent connections
+  const tabSocketsRef = useRef<Map<string, WebSocket>>(new Map());
+
+  // Factory function for clean tab creation
+  const createNewTab = (
+    id: string,
+    title: string,
+    protocol: TerminalTab['protocol'] = 'LOCAL',
+    target?: string
+  ): TerminalTab => {
+    return {
+      id,
+      title,
+      protocol,
+      target,
+      sessionState: 'local_shell',
+      remoteSessionName: '',
+      shellType: defaultShell,
+      currentPath: defaultPath,
+      currentUsername: 'User',
+      lines: [
+        {
+          id: `${Date.now()}-${Math.random()}`,
+          type: 'success',
+          text: WELCOME_BANNER,
+        },
+        {
+          id: `${Date.now()}-${Math.random()}`,
+          type: 'info',
+          text: `[SESSÃO INICIADA] Aba: ${title} // Protocolo: ${protocol}`,
+        },
+        {
+          id: `${Date.now()}-${Math.random()}`,
+          type: 'dim',
+          text: `Atalhos: Alt+T (Nova Aba) | Alt+W (Fechar Aba) | Alt+1..9 (Alternar Aba) | 'help' para ajuda`,
+        },
+        {
+          id: `${Date.now()}-${Math.random()}`,
+          type: 'stdout',
+          text: '',
+        },
+      ],
+      inputValue: '',
+      history: [],
+      historyIndex: -1,
+      pendingSsh: null,
+      isPasswordInput: false,
+      backendConnected: false,
+      hasUnread: false,
+    };
+  };
+
+  // MULTI-TAB STATE
+  const [tabs, setTabs] = useState<TerminalTab[]>(() => [
+    createNewTab('tab-1', 'Console 1 - Local', 'LOCAL'),
+  ]);
+  const [activeTabId, setActiveTabId] = useState<string>('tab-1');
+
+  // Keep fresh refs to active tab & tabs list for socket events
+  const activeTabIdRef = useRef<string>('tab-1');
+  activeTabIdRef.current = activeTabId;
+  const tabsRef = useRef<TerminalTab[]>(tabs);
+  tabsRef.current = tabs;
+
+  const currentTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
+
+  // Saved Quick Sessions
   const [sessions, setSessions] = useState<QuickSession[]>(() => {
     try {
       const saved = localStorage.getItem('CYBERDECK_QUICK_SESSIONS');
@@ -135,7 +193,7 @@ export default function App() {
   // Real-time Connection Logs
   const [logs, setLogs] = useState<ConnectionLog[]>([]);
 
-  // Sound Engine
+  // Retro Audio Engine
   const audioRef = useRef<RetroAudioEngine>(new RetroAudioEngine());
 
   // Add Log helper
@@ -158,140 +216,280 @@ export default function App() {
     setLogs((prev) => [...prev.slice(-200), newLog]);
   };
 
-  // Append line helper
+  // Append line to a specific tab
+  const appendLineToTab = (
+    tabId: string,
+    text: string,
+    type: TerminalLine['type'] = 'stdout',
+    isHtml = false
+  ) => {
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.id === tabId) {
+          const isBackground = tabId !== activeTabIdRef.current;
+          return {
+            ...t,
+            hasUnread: isBackground ? true : t.hasUnread,
+            lines: [
+              ...t.lines,
+              {
+                id: `${Date.now()}-${Math.random()}`,
+                type,
+                text,
+                isHtml,
+              },
+            ],
+          };
+        }
+        return t;
+      })
+    );
+  };
+
+  // Append line to active tab
   const appendLine = (
     text: string,
     type: TerminalLine['type'] = 'stdout',
     isHtml = false
   ) => {
-    setLines((prev) => [
-      ...prev,
-      {
-        id: `${Date.now()}-${Math.random()}`,
-        type,
-        text,
-        isHtml,
-      },
-    ]);
+    appendLineToTab(activeTabIdRef.current, text, type, isHtml);
   };
 
-  // Attempt connecting to the local Node.js backend bridge
-  const connectToBackend = (urlToConnect: string) => {
-    if (wsRef.current) {
+  // Connect socket for a specific tab
+  const connectTabSocket = (tabId: string, urlToConnect: string) => {
+    const existing = tabSocketsRef.current.get(tabId);
+    if (existing) {
       try {
-        wsRef.current.close();
-      } catch {
-        // Ignore
-      }
-      wsRef.current = null;
+        existing.close();
+      } catch {}
+      tabSocketsRef.current.delete(tabId);
     }
-
-    addLog('CONNECT', 'BACKEND', `Iniciando conexão com backend Node.js em ${urlToConnect}`);
 
     try {
       const socket = new WebSocket(urlToConnect);
+      tabSocketsRef.current.set(tabId, socket);
 
       socket.onopen = () => {
-        wsRef.current = socket;
-        setBackendConnected(true);
-        audioRef.current.playBeep(1200, 0.1);
-        appendLine(`[LINK ESTABELECIDO] Conectado ao Backend Node.js (${urlToConnect})`, 'success');
-        addLog('SUCCESS', 'BACKEND', `Link ativo com processo local em ${urlToConnect}`);
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === tabId
+              ? {
+                  ...t,
+                  backendConnected: true,
+                }
+              : t
+          )
+        );
+        appendLineToTab(
+          tabId,
+          `[LINK ESTABELECIDO] Conectado ao Backend Node.js (${urlToConnect})`,
+          'success'
+        );
+        addLog('SUCCESS', 'BACKEND', `Link ativo com processo local para aba ${tabId}`);
       };
 
       socket.onmessage = (event) => {
-        audioRef.current.playKeyClick();
+        if (tabId === activeTabIdRef.current) {
+          audioRef.current.playKeyClick();
+        }
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'init') {
-            if (data.data?.path) {
-              setCurrentPath(data.data.path);
-            }
-            if (data.data?.user) {
-              setCurrentUsername(data.data.user);
-              addLog('INFO', 'BACKEND', `Usuário do sistema: ${data.data.user}`);
-            }
-            if (data.data?.platform) {
-              setDetectedPlatform(data.data.platform);
-              if (data.data.platform === 'darwin') setShellType('zsh');
-              else if (data.data.platform === 'linux') setShellType('bash');
-            }
-            if (data.data?.os) {
-              setSystemInfoLabel(data.data.os);
-            }
+            setTabs((prev) =>
+              prev.map((t) => {
+                if (t.id === tabId) {
+                  return {
+                    ...t,
+                    currentPath: data.data?.path || t.currentPath,
+                    currentUsername: data.data?.user || t.currentUsername,
+                    shellType:
+                      data.data?.platform === 'darwin'
+                        ? 'zsh'
+                        : data.data?.platform === 'linux'
+                        ? 'bash'
+                        : t.shellType,
+                  };
+                }
+                return t;
+              })
+            );
+            if (data.data?.platform) setDetectedPlatform(data.data.platform);
+            if (data.data?.os) setSystemInfoLabel(data.data.os);
           } else if (data.type === 'prompt') {
             const newPath = data.data?.path || data.path;
-            if (newPath) setCurrentPath(newPath);
+            if (newPath) {
+              setTabs((prev) =>
+                prev.map((t) => (t.id === tabId ? { ...t, currentPath: newPath } : t))
+              );
+            }
           } else if (data.type === 'session_started') {
-            setSessionState('remote_session');
-            setRemoteSessionName(`${data.data?.protocol || 'REMOTE'}: ${data.data?.target || ''}`);
-            setIsPasswordInput(false);
-            setPendingSsh(null);
-            addLog('SUCCESS', data.data?.protocol || 'NET', `Sessão ativa com ${data.data?.target}`);
+            const proto = (data.data?.protocol || 'SSH') as any;
+            const target = data.data?.target || '';
+            setTabs((prev) =>
+              prev.map((t) => {
+                if (t.id === tabId) {
+                  return {
+                    ...t,
+                    sessionState: 'remote_session',
+                    remoteSessionName: `${proto}: ${target}`,
+                    protocol: proto,
+                    target,
+                    title: `${proto}: ${target}`,
+                    isPasswordInput: false,
+                    pendingSsh: null,
+                  };
+                }
+                return t;
+              })
+            );
+            addLog('SUCCESS', proto, `Sessão ativa com ${target} na aba ${tabId}`, target);
           } else if (data.type === 'session_closed') {
-            setSessionState('local_shell');
-            setRemoteSessionName('');
-            setIsPasswordInput(false);
-            setPendingSsh(null);
-            addLog('WARN', 'NET', `Sessão finalizada: ${data.data?.reason || ''}`);
+            setTabs((prev) =>
+              prev.map((t) => {
+                if (t.id === tabId) {
+                  return {
+                    ...t,
+                    sessionState: 'local_shell',
+                    remoteSessionName: '',
+                    protocol: 'LOCAL',
+                    isPasswordInput: false,
+                    pendingSsh: null,
+                  };
+                }
+                return t;
+              })
+            );
+            addLog('WARN', 'NET', `Sessão remota finalizada na aba ${tabId}: ${data.data?.reason || ''}`);
           } else if (data.type === 'stdout' || data.type === 'output') {
-            appendLine(data.data || data.text || '', 'stdout');
-            addLog('DATA', 'SHELL', `RX: ${String(data.data || data.text).slice(0, 40)}`);
+            appendLineToTab(tabId, data.data || data.text || '', 'stdout');
+            addLog('DATA', 'SHELL', `RX [${tabId}]: ${String(data.data || data.text).slice(0, 40)}`);
           } else if (data.type === 'stderr') {
-            appendLine(data.data || data.text || '', 'error');
-            addLog('ERR', 'SHELL', `ERR: ${String(data.data || data.text).slice(0, 40)}`);
+            appendLineToTab(tabId, data.data || data.text || '', 'error');
+            addLog('ERR', 'SHELL', `ERR [${tabId}]: ${String(data.data || data.text).slice(0, 40)}`);
           } else if (data.type === 'info') {
-            appendLine(data.data || data.text || '', 'info');
+            appendLineToTab(tabId, data.data || data.text || '', 'info');
           } else if (data.type === 'success') {
-            appendLine(data.data || data.text || '', 'success');
+            appendLineToTab(tabId, data.data || data.text || '', 'success');
           } else if (data.type === 'warning') {
-            appendLine(data.data || data.text || '', 'warning');
+            appendLineToTab(tabId, data.data || data.text || '', 'warning');
           } else if (data.type === 'dim') {
-            appendLine(data.data || data.text || '', 'dim');
+            appendLineToTab(tabId, data.data || data.text || '', 'dim');
           } else if (data.data !== undefined) {
-            appendLine(String(data.data), 'stdout');
+            appendLineToTab(tabId, String(data.data), 'stdout');
           } else {
-            appendLine(String(event.data), 'stdout');
+            appendLineToTab(tabId, String(event.data), 'stdout');
           }
         } catch {
-          appendLine(String(event.data), 'stdout');
+          appendLineToTab(tabId, String(event.data), 'stdout');
         }
       };
 
       socket.onerror = () => {
-        setBackendConnected(false);
-        addLog('WARN', 'BACKEND', `Backend Node.js offline em ${urlToConnect}. Modo cliente ativo.`);
+        setTabs((prev) =>
+          prev.map((t) => (t.id === tabId ? { ...t, backendConnected: false } : t))
+        );
       };
 
       socket.onclose = () => {
-        setBackendConnected(false);
-        wsRef.current = null;
-        addLog('WARN', 'BACKEND', `Conexão fechada com ${urlToConnect}`);
+        setTabs((prev) =>
+          prev.map((t) => (t.id === tabId ? { ...t, backendConnected: false } : t))
+        );
+        tabSocketsRef.current.delete(tabId);
       };
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      addLog('ERR', 'BACKEND', `Erro ao conectar: ${msg}`);
-      setBackendConnected(false);
+      console.error(`Erro ao conectar aba ${tabId}:`, err);
     }
+  };
+
+  // Reconnect all open tabs or a specific tab to backend
+  const connectAllTabs = (urlToConnect: string) => {
+    tabsRef.current.forEach((t) => {
+      connectTabSocket(t.id, urlToConnect);
+    });
+  };
+
+  // Switch Active Tab
+  const handleSelectTab = (id: string) => {
+    setActiveTabId(id);
+    setTabs((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, hasUnread: false } : t))
+    );
+    audioRef.current.playKeyClick();
+  };
+
+  // Create New Tab
+  const handleNewTab = (title?: string, sessionToLaunch?: QuickSession) => {
+    const newId = `tab-${Date.now()}`;
+    const newTitle =
+      title ||
+      (sessionToLaunch
+        ? `${sessionToLaunch.protocol}: ${sessionToLaunch.name || sessionToLaunch.ip}`
+        : `Console ${tabs.length + 1}`);
+    const initialProto = sessionToLaunch ? sessionToLaunch.protocol : 'LOCAL';
+    const newTab = createNewTab(newId, newTitle, initialProto, sessionToLaunch?.ip);
+
+    setTabs((prev) => [...prev, newTab]);
+    setActiveTabId(newId);
+    audioRef.current.playBeep(1400, 0.08);
+
+    // Conecta o socket dedicado para esta nova aba
+    connectTabSocket(newId, backendUrl);
+
+    // Se uma sessão foi fornecida para abrir diretamente na nova aba
+    if (sessionToLaunch) {
+      setTimeout(() => {
+        dispatchSessionOnTab(newId, sessionToLaunch);
+      }, 350);
+    }
+  };
+
+  // Close Tab
+  const handleCloseTab = (idToClose: string) => {
+    if (tabs.length <= 1) {
+      appendLine('[-] Impossível fechar a única aba aberta. Digite "clear" para limpar a tela.', 'warning');
+      return;
+    }
+
+    // Fecha socket da aba
+    const socket = tabSocketsRef.current.get(idToClose);
+    if (socket) {
+      try {
+        socket.send(JSON.stringify({ type: 'close_session' }));
+        socket.close();
+      } catch {}
+      tabSocketsRef.current.delete(idToClose);
+    }
+
+    const nextTabs = tabs.filter((t) => t.id !== idToClose);
+    setTabs(nextTabs);
+
+    if (activeTabId === idToClose) {
+      const idx = tabs.findIndex((t) => t.id === idToClose);
+      const nextActive = nextTabs[Math.max(0, idx - 1)] || nextTabs[0];
+      if (nextActive) {
+        setActiveTabId(nextActive.id);
+      }
+    }
+    audioRef.current.playKeyClick();
+  };
+
+  // Rename Tab
+  const handleRenameTab = (id: string, newTitle: string) => {
+    setTabs((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, title: newTitle } : t))
+    );
+    appendLineToTab(id, `[*] Aba renomeada para: "${newTitle}"`, 'info');
   };
 
   // Initialize Terminal on Mount
   useEffect(() => {
     document.body.setAttribute('data-theme', theme);
 
-    // Boot lines
-    appendLine(WELCOME_BANNER, 'success');
-    appendLine(`[SYS] Cyberdeck Universal CRT Terminal iniciado.`, 'info');
-    appendLine(`[SYS] Sessões Rápidas: ${sessions.length} salvas (use [+ Adicionar] para cadastrar seus hosts).`, 'dim');
-    appendLine(`[SYS] Link de comunicação: ${backendUrl}`, 'dim');
-    appendLine(`Digite 'help' para ver os comandos ou envie comandos diretamente para o shell.`, 'stdout');
-    appendLine('');
+    addLog('INFO', 'INIT', 'Cyberdeck CRT Terminal iniciado com suporte a múltiplas abas');
+    addLog('CONNECT', 'CLIENT', `Interface pronta para conexões concorrentes`);
 
-    addLog('INFO', 'INIT', 'Cyberdeck CRT Terminal iniciado');
-    addLog('CONNECT', 'CLIENT', `Interface pronta para comandos locais e remotos`);
-
-    // Try auto-connecting to local backend
-    connectToBackend(backendUrl);
+    // Auto-connect initial tab
+    connectTabSocket('tab-1', backendUrl);
 
     const handleFirstClick = () => {
       audioRef.current.initContext();
@@ -300,6 +498,35 @@ export default function App() {
     window.addEventListener('click', handleFirstClick);
     return () => window.removeEventListener('click', handleFirstClick);
   }, []);
+
+  // Global Keyboard Shortcuts (Alt+T, Alt+W, Alt+1..9)
+  useEffect(() => {
+    const handleGlobalShortcuts = (e: KeyboardEvent) => {
+      // Alt + T -> Nova Aba
+      if (e.altKey && e.key.toLowerCase() === 't') {
+        e.preventDefault();
+        handleNewTab();
+      }
+      // Alt + W -> Fechar Aba Ativa
+      if (e.altKey && e.key.toLowerCase() === 'w') {
+        e.preventDefault();
+        if (tabs.length > 1) {
+          handleCloseTab(activeTabIdRef.current);
+        }
+      }
+      // Alt + 1..9 -> Trocar para Aba
+      if (e.altKey && !isNaN(Number(e.key))) {
+        const idx = Number(e.key) - 1;
+        if (tabs[idx]) {
+          e.preventDefault();
+          handleSelectTab(tabs[idx].id);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalShortcuts);
+    return () => window.removeEventListener('keydown', handleGlobalShortcuts);
+  }, [tabs]);
 
   // Update theme on body
   const handleThemeChange = (newTheme: TerminalTheme) => {
@@ -336,7 +563,10 @@ export default function App() {
       'fira-code': "'Fira Code', monospace",
       'jetbrains': "'JetBrains Mono', monospace",
     };
-    document.documentElement.style.setProperty('--term-font', fontMap[typographyConfig.family] || "'Share Tech Mono', monospace");
+    document.documentElement.style.setProperty(
+      '--term-font',
+      fontMap[typographyConfig.family] || "'Share Tech Mono', monospace"
+    );
   }, [typographyConfig.family]);
 
   const handleTypographyConfigChange = (newVals: Partial<TypographyConfig>) => {
@@ -365,7 +595,10 @@ export default function App() {
       // Ignore
     }
     audioRef.current.playBeep(1100, 0.08);
-    appendLine(`[+] Novo acesso rápido salvo: ${created.name} (${created.protocol} -> ${created.ip})`, 'success');
+    appendLine(
+      `[+] Novo acesso rápido salvo: ${created.name} (${created.protocol} -> ${created.ip})`,
+      'success'
+    );
     addLog('INFO', 'CONFIG', `Novo acesso rápido registrado: ${created.name} [${created.protocol}]`);
   };
 
@@ -382,52 +615,130 @@ export default function App() {
     addLog('INFO', 'CONFIG', `Acesso rápido removido ID: ${id}`);
   };
 
-  // Run quick session
-  // Run quick session
-  const handleSelectQuickSession = (session: QuickSession) => {
-    setMobileTab('terminal');
+  // Dispatch Quick Session connection on a designated tab
+  const dispatchSessionOnTab = (tabId: string, session: QuickSession) => {
+    const socket = tabSocketsRef.current.get(tabId);
     if (session.protocol === 'TELNET') {
-      handleTelnetDispatch([session.ip, String(session.port || 23)]);
+      appendLineToTab(tabId, `[TELNET] Conectando a ${session.ip}:${session.port || 23}...`, 'info');
+      addLog('CONNECT', 'TELNET', `Abrindo socket TCP raw -> ${session.ip}:${session.port || 23}`, session.ip);
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(
+          JSON.stringify({
+            type: 'telnet',
+            host: session.ip,
+            port: session.port || 23,
+          })
+        );
+      } else {
+        appendLineToTab(tabId, `[AVISO] Backend Node.js offline. Inicie o backend na porta 3001.`, 'warning');
+      }
     } else if (session.protocol === 'SSH') {
       const user = session.user || 'admin';
       const port = session.port || 22;
-      appendLine(`[SSH] Acesso rápido selecionado: ${session.name} (${user}@${session.ip}:${port})`, 'info');
-      appendLine(`Digite a senha para ${user}@${session.ip}:`, 'stdout');
-      setPendingSsh({ host: session.ip, port, user });
-      setIsPasswordInput(true);
+      appendLineToTab(
+        tabId,
+        `[SSH] Acesso rápido selecionado: ${session.name} (${user}@${session.ip}:${port})`,
+        'info'
+      );
+      appendLineToTab(tabId, `Digite a senha para ${user}@${session.ip}:`, 'stdout');
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === tabId
+            ? {
+                ...t,
+                pendingSsh: { host: session.ip, port, user },
+                isPasswordInput: true,
+                protocol: 'SSH',
+                target: session.ip,
+                title: `SSH: ${session.name || session.ip}`,
+              }
+            : t
+        )
+      );
     } else if (session.protocol === 'PING') {
-      executeCommandLine(`ping ${session.ip}`);
-    } else if (session.protocol === 'SCAN') {
-      executeCommandLine(`ping ${session.ip}`);
+      appendLineToTab(tabId, `Disparando ${session.ip} com 32 bytes de dados:`, 'info');
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(
+          JSON.stringify({
+            type: 'stdin',
+            shell: 'powershell',
+            command: `ping ${session.ip}`,
+          })
+        );
+      } else {
+        handlePingFallback(tabId, session.ip);
+      }
     } else if (session.protocol === 'RAW') {
-      handleTelnetDispatch([session.ip, String(session.port || 8080)]);
+      appendLineToTab(tabId, `[RAW TCP] Conectando a ${session.ip}:${session.port || 8080}...`, 'info');
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(
+          JSON.stringify({
+            type: 'telnet',
+            host: session.ip,
+            port: session.port || 8080,
+          })
+        );
+      }
     }
   };
 
-  // Exit remote session
-  const exitRemoteSession = (reason = 'Sessão encerrada') => {
-    if (backendConnected && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'close_session' }));
+  // Run quick session either on active tab or in a brand new tab
+  const handleSelectQuickSession = (session: QuickSession, inNewTab = false) => {
+    setMobileTab('terminal');
+    if (inNewTab) {
+      handleNewTab(`${session.protocol}: ${session.name || session.ip}`, session);
+    } else {
+      dispatchSessionOnTab(activeTabId, session);
     }
-    setSessionState('windows_shell');
-    setRemoteSessionName('');
-    setIsPasswordInput(false);
-    setPendingSsh(null);
-    appendLine(`[-] ${reason}. Retornado ao prompt do Windows.`, 'dim');
-    addLog('WARN', 'DISCONNECT', `Sessão finalizada: ${reason}`);
+  };
+
+  // Exit remote session on the active tab
+  const exitRemoteSession = (reason = 'Sessão encerrada') => {
+    const socket = tabSocketsRef.current.get(currentTab.id);
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'close_session' }));
+    }
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === currentTab.id
+          ? {
+              ...t,
+              sessionState: 'local_shell',
+              remoteSessionName: '',
+              isPasswordInput: false,
+              pendingSsh: null,
+              protocol: 'LOCAL',
+            }
+          : t
+      )
+    );
+    appendLine(`[-] ${reason}. Retornado ao prompt local.`, 'dim');
+    addLog('WARN', 'DISCONNECT', `Sessão finalizada na aba ${currentTab.id}: ${reason}`);
   };
 
   // Command Execution Hub
   const executeCommandLine = (rawCommand: string) => {
-    // If waiting for SSH password
-    if (pendingSsh) {
-      const { host, port, user } = pendingSsh;
-      setPendingSsh(null);
-      setIsPasswordInput(false);
+    const tabId = currentTab.id;
+    const socket = tabSocketsRef.current.get(tabId);
+
+    // If waiting for SSH password in this tab
+    if (currentTab.pendingSsh) {
+      const { host, port, user } = currentTab.pendingSsh;
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === tabId
+            ? {
+                ...t,
+                pendingSsh: null,
+                isPasswordInput: false,
+              }
+            : t
+        )
+      );
       appendLine(`${user}@${host}'s password: ••••••••`, 'cmd');
       addLog('DATA', 'SSH', `Enviando credenciais para ${user}@${host}:${port}`);
-      if (backendConnected && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(
           JSON.stringify({
             type: 'ssh',
             host,
@@ -442,89 +753,138 @@ export default function App() {
 
     const trimmed = rawCommand.trim();
 
-    // If in remote session, empty line sends Enter to the remote device (e.g. Cisco prompt refresh)
-    if (!trimmed) {
-      if (sessionState === 'remote_session' && backendConnected && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: 'stdin', command: '' }));
+    // If in remote session, send input directly
+    if (currentTab.sessionState === 'remote_session') {
+      if (trimmed === 'exit' || trimmed === 'quit') {
+        exitRemoteSession('Comando exit recebido');
+        return;
+      }
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'stdin', command: trimmed }));
       }
       return;
     }
 
-    // Save to history
-    setHistory((prev) => [...prev, trimmed]);
-    setHistoryIndex(-1);
+    if (!trimmed) return;
 
-    audioRef.current.playBeep(920, 0.05);
-
-    // If active remote session, forward input directly to the switch/SSH!
-    if (sessionState === 'remote_session') {
-      if (trimmed.toLowerCase() === 'exit' || trimmed.toLowerCase() === 'quit') {
-        if (backendConnected && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({ type: 'stdin', command: trimmed }));
-        }
-        return;
-      }
-      if (backendConnected && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: 'stdin', command: rawCommand }));
-        addLog('DATA', 'REMOTE', `TX: ${trimmed}`);
-        return;
-      }
-    }
+    // Record history in this tab
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              history: [...t.history, trimmed],
+              historyIndex: -1,
+            }
+          : t
+      )
+    );
 
     const parts = trimmed.split(/\s+/);
     const cmd = parts[0].toLowerCase();
     const args = parts.slice(1);
 
-    // Built-in terminal client commands
-    if (cmd === 'cls' || cmd === 'clear') {
-      setLines([]);
-      return;
-    }
-
-    if (cmd === 'exit' || cmd === 'quit') {
-      if (sessionState === 'remote_session') {
-        exitRemoteSession('Sessão remota encerrada pelo usuário');
-      } else {
-        appendLine('Terminal Windows pronto. Sessão mantida ativa.', 'dim');
+    // TAB MANAGEMENT COMMANDS (tab new, tab close, tab rename, tab <n>)
+    if (cmd === 'tab' || cmd === 'tabs' || cmd === 'aba' || cmd === 'abas') {
+      const sub = args[0]?.toLowerCase();
+      if (!sub || sub === 'list' || sub === 'listar') {
+        appendLine('=== ABAS DE TERMINAL ATIVAS ===', 'info');
+        tabsRef.current.forEach((t, i) => {
+          const isCurr = t.id === currentTab.id;
+          const status =
+            t.sessionState === 'remote_session'
+              ? `[REMOTA: ${t.remoteSessionName}]`
+              : t.backendConnected
+              ? '[LOCAL CONECTADO]'
+              : '[OFFLINE]';
+          appendLine(
+            `${isCurr ? '▶ ' : '  '}[${i + 1}] ${t.title} (${t.protocol}) - ${status}`,
+            isCurr ? 'success' : 'stdout'
+          );
+        });
+        appendLine('Comandos: tab new [nome] | tab close | tab rename <nome> | tab <numero>', 'dim');
+        appendLine('Atalhos: Alt+T (Nova Aba) | Alt+W (Fechar Aba) | Alt+1..9 (Alternar Aba)', 'dim');
+        return;
       }
+      if (sub === 'new' || sub === 'nova') {
+        const customTitle = args.slice(1).join(' ');
+        handleNewTab(customTitle || undefined);
+        return;
+      }
+      if (sub === 'close' || sub === 'fechar') {
+        handleCloseTab(currentTab.id);
+        return;
+      }
+      if (sub === 'rename' || sub === 'renomear') {
+        const newName = args.slice(1).join(' ');
+        if (!newName) {
+          appendLine('Uso: tab rename <novo nome>', 'warning');
+          return;
+        }
+        handleRenameTab(currentTab.id, newName);
+        return;
+      }
+      const num = parseInt(sub, 10);
+      if (!isNaN(num) && num >= 1 && num <= tabsRef.current.length) {
+        handleSelectTab(tabsRef.current[num - 1].id);
+        return;
+      }
+      appendLine(`Comando '${sub}' não reconhecido. Use: tab new, tab close, tab rename, tab <numero>`, 'warning');
       return;
     }
 
-    if (cmd === 'help') {
-      cmdHelp();
+    if (cmd === 'clear' || cmd === 'cls' || cmd === 'limpar') {
+      setTabs((prev) =>
+        prev.map((t) => (t.id === currentTab.id ? { ...t, lines: [] } : t))
+      );
+      return;
+    }
+
+    if (cmd === 'help' || cmd === 'ajuda' || cmd === '?') {
+      printHelp();
       return;
     }
 
     if (cmd === 'powershell' || cmd === 'pwsh') {
-      setShellType('powershell');
+      setTabs((prev) =>
+        prev.map((t) => (t.id === currentTab.id ? { ...t, shellType: 'powershell' } : t))
+      );
       appendLine('Shell configurado para: Windows PowerShell (pwsh)', 'info');
       addLog('INFO', 'SHELL', 'Shell alterado para PowerShell');
       return;
     }
 
     if (cmd === 'cmd') {
-      setShellType('cmd');
+      setTabs((prev) =>
+        prev.map((t) => (t.id === currentTab.id ? { ...t, shellType: 'cmd' } : t))
+      );
       appendLine('Shell configurado para: Prompt de Comando do Windows (cmd.exe)', 'info');
       addLog('INFO', 'SHELL', 'Shell alterado para CMD');
       return;
     }
 
     if (cmd === 'bash') {
-      setShellType('bash');
+      setTabs((prev) =>
+        prev.map((t) => (t.id === currentTab.id ? { ...t, shellType: 'bash' } : t))
+      );
       appendLine('Shell configurado para: GNU Bash (/bin/bash)', 'info');
       addLog('INFO', 'SHELL', 'Shell alterado para Bash');
       return;
     }
 
     if (cmd === 'zsh') {
-      setShellType('zsh');
+      setTabs((prev) =>
+        prev.map((t) => (t.id === currentTab.id ? { ...t, shellType: 'zsh' } : t))
+      );
       appendLine('Shell configurado para: Z Shell (/bin/zsh - macOS/Unix)', 'info');
       addLog('INFO', 'SHELL', 'Shell alterado para Zsh');
       return;
     }
 
     if (cmd === 'sh') {
-      setShellType('sh');
+      setTabs((prev) =>
+        prev.map((t) => (t.id === currentTab.id ? { ...t, shellType: 'sh' } : t))
+      );
       appendLine('Shell configurado para: POSIX Shell (/bin/sh)', 'info');
       addLog('INFO', 'SHELL', 'Shell alterado para Sh');
       return;
@@ -551,7 +911,8 @@ export default function App() {
         updateCrtConfig({ mode: 'off' });
         appendLine('[*] Filtro CRT DESATIVADO', 'dim');
       } else if (sub === 'bloom') {
-        const nextBloom = crtConfig.bloom === 'extreme' ? 'normal' : crtConfig.bloom === 'normal' ? 'soft' : 'extreme';
+        const nextBloom =
+          crtConfig.bloom === 'extreme' ? 'normal' : crtConfig.bloom === 'normal' ? 'soft' : 'extreme';
         updateCrtConfig({ bloom: nextBloom });
         appendLine(`[*] Brilho do fósforo (Bloom): ${nextBloom.toUpperCase()}`, 'info');
       } else if (sub === 'bezel' || sub === 'moldura') {
@@ -569,83 +930,21 @@ export default function App() {
       return;
     }
 
-    if (cmd === 'font' || cmd === 'fonte' || cmd === 'typography') {
+    if (cmd === 'font' || cmd === 'fonte') {
       const sub = args[0]?.toLowerCase();
-      const val = args[1]?.toLowerCase();
-
       if (!sub) {
-        appendLine('CONFIGURAÇÃO ATUAL DE TIPOGRAFIA:', 'info');
-        appendLine(`• Família da Fonte : ${typographyConfig.family} (${typographyConfig.family === 'share-tech' ? 'Share Tech Mono' : typographyConfig.family === 'vt323' ? 'VT323 (DEC CRT)' : typographyConfig.family === 'fira-code' ? 'Fira Code' : 'JetBrains Mono'})`, 'stdout');
-        appendLine(`• Tamanho da Fonte : ${typographyConfig.size.toUpperCase()} (${typographyConfig.size === 'sm' ? 'Pequena - 12px' : typographyConfig.size === 'md' ? 'Média - 14px' : 'Grande - 16px'})`, 'stdout');
-        appendLine(`• Espaço Linhas    : ${typographyConfig.spacing.toUpperCase()} (${typographyConfig.spacing === 'tight' ? 'Compacto - 1.25x' : typographyConfig.spacing === 'loose' ? 'Espaçado - 1.95x' : 'Normal - 1.55x'})`, 'stdout');
-        appendLine('Comandos disponíveis:', 'dim');
-        appendLine('  font family <share | vt323 | fira | jetbrains>', 'dim');
-        appendLine('  font size <pequena | media | grande | sm | md | lg>', 'dim');
-        appendLine('  font space <compacto | normal | espacado | tight | normal | loose>', 'dim');
-        appendLine('  font reset', 'dim');
+        appendLine('=== AJUSTES DE TIPOGRAFIA CRT ===', 'info');
+        appendLine(`• Família atual:     ${typographyConfig.family.toUpperCase()}`, 'stdout');
+        appendLine(`• Tamanho atual:     ${typographyConfig.size.toUpperCase()}`, 'stdout');
+        appendLine(`• Espaçamento atual: ${typographyConfig.spacing.toUpperCase()}`, 'stdout');
+        appendLine('Uso: font <share-tech | vt323 | fira-code | jetbrains>', 'dim');
+        appendLine('     font <sm | md | lg>', 'dim');
+        appendLine('     font <compacto | normal | espacado>', 'dim');
         return;
       }
 
-      if (sub === 'family' || sub === 'familia' || sub === 'face' || sub === 'tipo') {
-        if (['share', 'share-tech', 'sharetech'].includes(val)) {
-          handleTypographyConfigChange({ family: 'share-tech' });
-          appendLine('[*] Fonte alterada para: Share Tech Mono (Cyberdeck HUD Militar)', 'success');
-        } else if (['vt323', 'vt', 'dec', 'crt'].includes(val)) {
-          handleTypographyConfigChange({ family: 'vt323' });
-          appendLine('[*] Fonte alterada para: VT323 (DEC VT220 Retro Phosphor Tube 80s)', 'success');
-        } else if (['fira', 'fira-code', 'firacode'].includes(val)) {
-          handleTypographyConfigChange({ family: 'fira-code' });
-          appendLine('[*] Fonte alterada para: Fira Code (Hacker Monospace)', 'success');
-        } else if (['jetbrains', 'jetbrains-mono', 'jet'].includes(val)) {
-          handleTypographyConfigChange({ family: 'jetbrains' });
-          appendLine('[*] Fonte alterada para: JetBrains Mono (Alta Definição)', 'success');
-        } else {
-          appendLine('Uso: font family <share | vt323 | fira | jetbrains>', 'warning');
-        }
-        return;
-      }
-
-      if (sub === 'size' || sub === 'tamanho') {
-        if (['sm', 'pequena', 'pequeno', 'small', '12', '1'].includes(val)) {
-          handleTypographyConfigChange({ size: 'sm' });
-          appendLine('[*] Tamanho da fonte definido para: PEQUENA (12px)', 'success');
-        } else if (['md', 'media', 'medio', 'medium', '14', '2'].includes(val)) {
-          handleTypographyConfigChange({ size: 'md' });
-          appendLine('[*] Tamanho da fonte definido para: MÉDIA (14px - Padrão)', 'success');
-        } else if (['lg', 'grande', 'large', '16', '3'].includes(val)) {
-          handleTypographyConfigChange({ size: 'lg' });
-          appendLine('[*] Tamanho da fonte definido para: GRANDE (16px)', 'success');
-        } else {
-          appendLine('Uso: font size <pequena | media | grande> (ou sm | md | lg)', 'warning');
-        }
-        return;
-      }
-
-      if (sub === 'space' || sub === 'spacing' || sub === 'espaco' || sub === 'espacamento' || sub === 'linhas') {
-        if (['tight', 'compacto', 'denso', '1'].includes(val)) {
-          handleTypographyConfigChange({ spacing: 'tight' });
-          appendLine('[*] Espaçamento entre linhas definido para: COMPACTO (1.25x)', 'success');
-        } else if (['normal', 'padrao', 'medio', '2'].includes(val)) {
-          handleTypographyConfigChange({ spacing: 'normal' });
-          appendLine('[*] Espaçamento entre linhas definido para: NORMAL (1.55x - Padrão)', 'success');
-        } else if (['loose', 'espacado', 'amplo', 'aberto', '3'].includes(val)) {
-          handleTypographyConfigChange({ spacing: 'loose' });
-          appendLine('[*] Espaçamento entre linhas definido para: ESPAÇADO (1.95x)', 'success');
-        } else {
-          appendLine('Uso: font space <compacto | normal | espacado> (ou tight | normal | loose)', 'warning');
-        }
-        return;
-      }
-
-      if (sub === 'reset' || sub === 'padrao') {
-        handleTypographyConfigChange({ family: 'share-tech', size: 'md', spacing: 'normal' });
-        appendLine('[*] Tipografia restaurada para as configurações padrão de fábrica.', 'success');
-        return;
-      }
-
-      // Quick direct shortcuts e.g. "font vt323", "font lg", "font loose"
-      if (['share', 'share-tech', 'vt323', 'fira-code', 'fira', 'jetbrains'].includes(sub)) {
-        const targetFam = sub === 'vt323' ? 'vt323' : sub.startsWith('fira') ? 'fira-code' : sub.startsWith('jet') ? 'jetbrains' : 'share-tech';
+      if (['share-tech', 'vt323', 'fira-code', 'jetbrains'].includes(sub)) {
+        const targetFam = sub as TerminalFontFamily;
         handleTypographyConfigChange({ family: targetFam });
         appendLine(`[*] Fonte alterada para: ${targetFam}`, 'success');
         return;
@@ -700,7 +999,7 @@ export default function App() {
     }
 
     if (cmd === 'history') {
-      history.forEach((h, i) => appendLine(`${i + 1}  ${h}`, 'dim'));
+      currentTab.history.forEach((h, i) => appendLine(`${i + 1}  ${h}`, 'dim'));
       return;
     }
 
@@ -710,9 +1009,9 @@ export default function App() {
         setBackendUrl(newUrl);
         localStorage.setItem('CYBERDECK_BACKEND_URL', newUrl);
         appendLine(`[CONFIG] URL do Backend Node.js definida para: ${newUrl}`, 'success');
-        connectToBackend(newUrl);
+        connectAllTabs(newUrl);
       } else {
-        appendLine(`Backend configurado: ${backendUrl} (${backendConnected ? 'CONECTADO' : 'DESCONECTADO'})`, 'info');
+        appendLine(`Backend configurado: ${backendUrl} (${currentTab.backendConnected ? 'CONECTADO' : 'DESCONECTADO'})`, 'info');
         appendLine(`Para alterar: backend ws://localhost:3001`, 'dim');
       }
       return;
@@ -720,8 +1019,8 @@ export default function App() {
 
     if (cmd === 'reconnect' || (cmd === 'connect' && (!args[0] || args[0].startsWith('ws://') || args[0].startsWith('http://')))) {
       const targetUrl = args[0] || backendUrl;
-      appendLine(`Reconectando ao backend Node.js em ${targetUrl}...`, 'info');
-      connectToBackend(targetUrl);
+      appendLine(`Reconectando aba ao backend Node.js em ${targetUrl}...`, 'info');
+      connectTabSocket(tabId, targetUrl);
       return;
     }
 
@@ -741,21 +1040,21 @@ export default function App() {
       return;
     }
 
-    // If backend WebSocket is connected, forward the real command directly to the Windows process!
-    if (backendConnected && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      addLog('DATA', 'TX', `Comando enviado ao processo Windows: ${trimmed}`);
-      wsRef.current.send(
+    // Forward command to backend WebSocket if connected!
+    if (currentTab.backendConnected && socket && socket.readyState === WebSocket.OPEN) {
+      addLog('DATA', 'TX', `Comando enviado ao processo: ${trimmed}`);
+      socket.send(
         JSON.stringify({
           type: 'stdin',
-          shell: shellType,
+          shell: currentTab.shellType,
           command: trimmed,
-          path: currentPath,
+          path: currentTab.currentPath,
         })
       );
       return;
     }
 
-    // If backend is not currently connected:
+    // Fallback offline simulation
     handleOfflineDispatch(trimmed, cmd, args);
   };
 
@@ -769,13 +1068,13 @@ export default function App() {
     let host = '';
     let port = 22;
 
-    const target = args[0];
-    if (target.includes('@')) {
-      const parts = target.split('@');
-      user = parts[0];
-      host = parts[1];
+    const rawTarget = args[0];
+    if (rawTarget.includes('@')) {
+      const [u, h] = rawTarget.split('@');
+      user = u;
+      host = h;
     } else {
-      host = target;
+      host = rawTarget;
     }
 
     for (let i = 1; i < args.length; i++) {
@@ -788,17 +1087,23 @@ export default function App() {
       }
     }
 
-    if (!backendConnected) {
-      appendLine(`[AVISO] Backend Node.js offline. Inicie 'node server-windows-terminal.js' no Windows.`, 'error');
-      return;
-    }
-
-    audioRef.current.playCarrierTone();
-    appendLine(`[SSH] Conectando a ${user}@${host}:${port}...`, 'info');
+    appendLine(`Conectando via SSH seguro a ${user}@${host}:${port}...`, 'info');
     appendLine(`Digite a senha para ${user}@${host}:`, 'stdout');
-    setPendingSsh({ host, port, user });
-    setIsPasswordInput(true);
-    addLog('CONNECT', 'SSH', `Solicitando autenticação para ${user}@${host}:${port}`, host);
+
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === currentTab.id
+          ? {
+              ...t,
+              pendingSsh: { host, port, user },
+              isPasswordInput: true,
+              protocol: 'SSH',
+              target: host,
+              title: `SSH: ${user}@${host}`,
+            }
+          : t
+      )
+    );
   };
 
   const handleTelnetDispatch = (args: string[]) => {
@@ -806,26 +1111,55 @@ export default function App() {
       appendLine('Uso: telnet <host> [porta]', 'warning');
       return;
     }
+
     const host = args[0];
-    const port = args[1] ? parseInt(args[1], 10) : 23;
+    const port = parseInt(args[1] || '23', 10);
+    const socket = tabSocketsRef.current.get(currentTab.id);
 
-    if (!backendConnected) {
-      appendLine(`[AVISO] Backend Node.js offline em ${backendUrl}.`, 'error');
-      appendLine(`Inicie o backend no Windows ('node server-windows-terminal.js') para abrir o soquete TCP.`, 'dim');
-      return;
-    }
-
-    audioRef.current.playCarrierTone();
-    appendLine(`[TELNET] Conectando a ${host}:${port}...`, 'info');
+    appendLine(`Conectando via Telnet / Raw TCP a ${host}:${port}...`, 'info');
     addLog('CONNECT', 'TELNET', `Abrindo socket TCP raw -> ${host}:${port}`, host);
 
-    wsRef.current?.send(
-      JSON.stringify({
-        type: 'telnet',
-        host,
-        port,
-      })
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === currentTab.id
+          ? {
+              ...t,
+              protocol: 'TELNET',
+              target: host,
+              title: `Telnet: ${host}:${port}`,
+            }
+          : t
+      )
     );
+
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(
+        JSON.stringify({
+          type: 'telnet',
+          host,
+          port,
+        })
+      );
+    } else {
+      appendLine(`[AVISO] Backend Node.js offline. Inicie o backend na porta 3001.`, 'warning');
+    }
+  };
+
+  const handlePingFallback = (tabId: string, target: string) => {
+    const start = performance.now();
+    appendLineToTab(tabId, `Disparando teste de alcance ICMP/Host para ${target}...`, 'dim');
+
+    fetch(`https://${target}`, { mode: 'no-cors' })
+      .then(() => {
+        const rtt = (performance.now() - start).toFixed(1);
+        appendLineToTab(tabId, `Resposta de ${target}: tempo=${rtt}ms`, 'success');
+        addLog('SUCCESS', 'ICMP', `Host ${target} respondeu em ${rtt}ms`, target);
+      })
+      .catch(() => {
+        const rtt = (performance.now() - start).toFixed(1);
+        appendLineToTab(tabId, `Host ${target} contatado (latência de rota: ${rtt}ms)`, 'stdout');
+        addLog('DATA', 'ICMP', `Sonda para ${target} finalizada em ${rtt}ms`, target);
+      });
   };
 
   const handlePingDispatch = (target: string) => {
@@ -833,31 +1167,18 @@ export default function App() {
     appendLine(`Disparando ${target} com 32 bytes de dados:`, 'info');
     addLog('CONNECT', 'ICMP', `Iniciando teste de conectividade com ${target}`, target);
 
-    if (backendConnected && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(
+    const socket = tabSocketsRef.current.get(currentTab.id);
+    if (currentTab.backendConnected && socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(
         JSON.stringify({
           type: 'stdin',
-          shell: shellType,
+          shell: currentTab.shellType,
           command: `ping ${target}`,
-          path: currentPath,
+          path: currentTab.currentPath,
         })
       );
     } else {
-      // Local client network check
-      const start = performance.now();
-      appendLine(`Disparando teste de alcance ICMP/Host para ${target}...`, 'dim');
-
-      fetch(`https://${target}`, { mode: 'no-cors' })
-        .then(() => {
-          const rtt = (performance.now() - start).toFixed(1);
-          appendLine(`Resposta de ${target}: tempo=${rtt}ms`, 'success');
-          addLog('SUCCESS', 'ICMP', `Host ${target} respondeu em ${rtt}ms`, target);
-        })
-        .catch(() => {
-          const rtt = (performance.now() - start).toFixed(1);
-          appendLine(`Host ${target} contatado (latência de rota: ${rtt}ms)`, 'stdout');
-          addLog('DATA', 'ICMP', `Sonda para ${target} finalizada em ${rtt}ms`, target);
-        });
+      handlePingFallback(currentTab.id, target);
     }
   };
 
@@ -865,7 +1186,7 @@ export default function App() {
     addLog('DATA', 'CLIENT', `Comando local: ${commandLine}`);
 
     if (cmd === 'dir' || cmd === 'ls') {
-      appendLine(` Diretório de ${currentPath}`, 'dim');
+      appendLine(` Diretório de ${currentTab.currentPath}`, 'dim');
       appendLine('');
       appendLine('  Modo                Comprimento Nome', 'dim');
       appendLine('  ----                ----------- ----', 'dim');
@@ -881,23 +1202,27 @@ export default function App() {
     if (cmd === 'cd') {
       const target = args[0] || 'C:\\Users\\Admin';
       if (target === '..') {
-        const parts = currentPath.split('\\');
+        const parts = currentTab.currentPath.split('\\');
         if (parts.length > 1) {
           parts.pop();
           const newPath = parts.join('\\') || 'C:\\';
-          setCurrentPath(newPath);
+          setTabs((prev) =>
+            prev.map((t) => (t.id === currentTab.id ? { ...t, currentPath: newPath } : t))
+          );
           appendLine(newPath, 'dim');
         }
       } else {
-        const newPath = target.startsWith('C:') ? target : `${currentPath}\\${target}`;
-        setCurrentPath(newPath);
+        const newPath = target.startsWith('C:') ? target : `${currentTab.currentPath}\\${target}`;
+        setTabs((prev) =>
+          prev.map((t) => (t.id === currentTab.id ? { ...t, currentPath: newPath } : t))
+        );
         appendLine(newPath, 'dim');
       }
       return;
     }
 
-    if (cmd === 'ipconfig') {
-      appendLine('Configuração de IP do Windows', 'info');
+    if (cmd === 'ipconfig' || cmd === 'ifconfig') {
+      appendLine('Configuração de IP do Terminal Cyberdeck', 'info');
       appendLine('');
       appendLine('Adaptador Ethernet Ethernet0:', 'dim');
       appendLine('   Sufixo DNS específico de conexão. . . : localdomain', 'stdout');
@@ -920,49 +1245,69 @@ export default function App() {
 
     if (cmd === 'systeminfo') {
       const isDesktop = typeof window !== 'undefined' && (window as any).cyberdeckDesktop?.isElectron;
-      const arch = isDesktop && (window as any).cyberdeckDesktop?.arch
-        ? `${(window as any).cyberdeckDesktop.arch} (64-bit Nativo Desktop)`
-        : 'x64 (Browser / V8 Engine)';
-      appendLine(`Nome do Host:                      ${currentUsername}-CYBERDECK`, 'stdout');
+      const arch =
+        isDesktop && (window as any).cyberdeckDesktop?.arch
+          ? `${(window as any).cyberdeckDesktop.arch} (64-bit Nativo Desktop)`
+          : 'x64 (Browser / V8 Engine)';
+      appendLine(`Nome do Host:                      ${currentTab.currentUsername}-CYBERDECK`, 'stdout');
       appendLine(`Nome do SO:                        ${systemInfoLabel}`, 'stdout');
       appendLine(`Plataforma / Arquitetura:          ${detectedPlatform} / ${arch}`, 'success');
-      appendLine(`Interpretador Shell Atual:         ${shellType.toUpperCase()}`, 'stdout');
-      appendLine(`Diretório Atual:                   ${currentPath}`, 'stdout');
-      appendLine(`Backend:                           ${backendConnected ? 'Conectado (ws://127.0.0.1:3001)' : 'Offline / Standalone'}`, 'stdout');
+      appendLine(`Aba Ativa:                         ${currentTab.title} [${currentTab.protocol}]`, 'info');
+      appendLine(`Total de Abas Concorrentes:        ${tabs.length}`, 'info');
+      appendLine(`Interpretador Shell Atual:         ${currentTab.shellType.toUpperCase()}`, 'stdout');
+      appendLine(`Diretório Atual:                   ${currentTab.currentPath}`, 'stdout');
+      appendLine(`Backend:                           ${currentTab.backendConnected ? 'Conectado (ws://127.0.0.1:3001)' : 'Offline / Standalone'}`, 'stdout');
       return;
     }
 
-    appendLine(`'${commandLine}' enviado para o terminal.`, 'stdout');
-    appendLine(`[INFO] Para execução direta no shell nativo, inicie o backend Node.js ('node server-terminal.js') e use 'reconnect'.`, 'dim');
+    // Default unknown command
+    appendLine(`'${cmd}' não é reconhecido como um comando interno ou externo.`, 'error');
+    appendLine(`Digite 'help' para comandos de rede e atalhos, ou inicie o backend Node.js.`, 'dim');
   };
 
-  const cmdHelp = () => {
-    appendLine(`CYBERDECK // COMANDOS DO TERMINAL MULTIPLATAFORMA:`, 'info');
+  const printHelp = () => {
+    appendLine(`================================================================================`, 'info');
+    appendLine(`                     CYBERDECK CRT TERMINAL // MANUAL DE COMANDOS               `, 'info');
+    appendLine(`================================================================================`, 'info');
+    appendLine(`GERENCIAMENTO DE ABAS & MULTI-EQUIPAMENTOS:`, 'warning');
+    appendLine(`• tab new [nome]           : Abre uma nova aba para conectar a outro equipamento.`, 'stdout');
+    appendLine(`• tab close                : Fecha a aba ativa atual.`, 'stdout');
+    appendLine(`• tab rename <nome>        : Renomeia o título da aba atual.`, 'stdout');
+    appendLine(`• tab <numero>             : Alterna direto para a aba 1, 2, 3...`, 'stdout');
+    appendLine(`• tabs / tab list          : Lista todas as abas abertas e seus status.`, 'stdout');
+    appendLine(`• Atalhos de Teclado       : Alt+T (Nova Aba) | Alt+W (Fechar) | Alt+1..9 (Trocar).`, 'success');
+    appendLine(``, 'stdout');
+    appendLine(`COMANDOS DE REDE & DISPOSITIVOS:`, 'warning');
+    appendLine(`• ssh <user@host> [-p porta]: Inicia sessão SSH interativa no roteador/servidor.`, 'stdout');
+    appendLine(`• telnet <host> [porta]    : Conexão direta TCP Socket Telnet para switches/roteadores.`, 'stdout');
+    appendLine(`• ping <host>              : Dispara teste de conectividade ICMP e latência.`, 'stdout');
+    appendLine(``, 'stdout');
+    appendLine(`INTERPRETADORES DE SHELL:`, 'warning');
+    appendLine(`• powershell / pwsh        : Alterna para o Windows PowerShell.`, 'stdout');
+    appendLine(`• cmd                      : Alterna para o Prompt de Comando (CMD).`, 'stdout');
+    appendLine(`• bash / zsh / sh          : Alterna para interpretador Unix/Linux/macOS.`, 'stdout');
+    appendLine(``, 'stdout');
+    appendLine(`VISUAL & SISTEMA:`, 'warning');
+    appendLine(`• theme [green|amber|cyan] : Altera paleta de fósforo da tela CRT.`, 'stdout');
+    appendLine(`• crt [real|leve|bloom|off]: Modos do tubo catódico, curvatura e moldura bezel.`, 'stdout');
+    appendLine(`• font [family|size|space] : Tipografia CRT: 4 fontes, 3 tamanhos e espaçamentos.`, 'stdout');
+    appendLine(`• browser / web <url>      : Abre navegador web integrado com efeito CRT (Alpha).`, 'stdout');
+    appendLine(`• systeminfo               : Exibe arquitetura 64-bit, SO e detalhes de conexão.`, 'stdout');
+    appendLine(`• clear / cls              : Limpa a tela da aba atual.`, 'stdout');
     appendLine(`--------------------------------------------------------------------------------`, 'dim');
-    appendLine(`• powershell / cmd / bash / zsh : Alterna o interpretador de comandos.`, 'stdout');
-    appendLine(`• ssh <host> [-l user] [-p port] : Cliente SSH interativo com autenticação segura.`, 'stdout');
-    appendLine(`• telnet <host> [porta]    : Conecta a switches/roteadores (porta 23 TCP com RFC 854).`, 'stdout');
-    appendLine(`• ping <host/ip>           : Mede latência e conectividade de rede.`, 'stdout');
-    appendLine(`• backend [url]            : Configura a URL do WebSocket do backend Node.js.`, 'stdout');
-    appendLine(`• reconnect                : Reconecta ao backend Node.js local.`, 'stdout');
-    appendLine(`• theme <cor>              : Altera o fósforo CRT [green | amber | cyan | magenta].`, 'stdout');
-    appendLine(`• crt [real|leve|off|bloom] : Filtro tubo CRT vintage (Cool-Retro-Term), scanlines e bloom.`, 'stdout');
-    appendLine(`• font [family|size|space] : Tipografia CRT: 4 fontes temáticas, 3 tamanhos e 3 espaçamentos.`, 'stdout');
-    appendLine(`• browser / web / surf <url> : Abre navegador integrado na tela com efeito CRT sincronizado.`, 'stdout');
-    appendLine(`• dir / ls, cd, ifconfig   : Comandos padrão do shell local.`, 'stdout');
-    appendLine(`• exit                     : Desconecta de sessões remotas.`, 'stdout');
-    appendLine(`--------------------------------------------------------------------------------`, 'dim');
-    appendLine(`Cadastre seus servidores e switches no painel lateral [SESSÕES RÁPIDAS]!`, 'warning');
+    appendLine(`Cadastre seus equipamentos no painel lateral [SESSÕES RÁPIDAS]!`, 'success');
   };
 
-  // Keyboard navigation & Enter submission
+  // Keyboard navigation & Enter submission on the active tab
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     audioRef.current.playKeyClick();
 
     if (e.key === 'Enter') {
       e.preventDefault();
-      const current = inputValue;
-      setInputValue('');
+      const current = currentTab.inputValue;
+      setTabs((prev) =>
+        prev.map((t) => (t.id === currentTab.id ? { ...t, inputValue: '' } : t))
+      );
 
       // Freeze command into terminal output
       const prefix = getPromptPrefix();
@@ -971,26 +1316,58 @@ export default function App() {
       executeCommandLine(current);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      if (history.length === 0) return;
-      let newIdx = historyIndex === -1 ? history.length - 1 : historyIndex - 1;
+      if (currentTab.history.length === 0) return;
+      let newIdx =
+        currentTab.historyIndex === -1
+          ? currentTab.history.length - 1
+          : currentTab.historyIndex - 1;
       if (newIdx < 0) newIdx = 0;
-      setHistoryIndex(newIdx);
-      setInputValue(history[newIdx] || '');
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === currentTab.id
+            ? {
+                ...t,
+                historyIndex: newIdx,
+                inputValue: t.history[newIdx] || '',
+              }
+            : t
+        )
+      );
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      if (history.length === 0 || historyIndex === -1) return;
-      const newIdx = historyIndex + 1;
-      if (newIdx >= history.length) {
-        setHistoryIndex(-1);
-        setInputValue('');
+      if (currentTab.history.length === 0 || currentTab.historyIndex === -1) return;
+      const newIdx = currentTab.historyIndex + 1;
+      if (newIdx >= currentTab.history.length) {
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === currentTab.id
+              ? {
+                  ...t,
+                  historyIndex: -1,
+                  inputValue: '',
+                }
+              : t
+          )
+        );
       } else {
-        setHistoryIndex(newIdx);
-        setInputValue(history[newIdx] || '');
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === currentTab.id
+              ? {
+                  ...t,
+                  historyIndex: newIdx,
+                  inputValue: t.history[newIdx] || '',
+                }
+              : t
+          )
+        );
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      const current = inputValue.trim();
+      const current = currentTab.inputValue.trim();
       const baseCommands = [
+        'tab',
+        'tabs',
         'powershell',
         'pwsh',
         'cmd',
@@ -1022,50 +1399,64 @@ export default function App() {
       ];
       const match = baseCommands.find((c) => c.startsWith(current));
       if (match) {
-        setInputValue(match + ' ');
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === currentTab.id ? { ...t, inputValue: match + ' ' } : t
+          )
+        );
       }
     } else if (e.key === 'c' && e.ctrlKey) {
       appendLine('^C', 'warning');
-      setInputValue('');
-      if (sessionState === 'remote_session') {
+      setTabs((prev) =>
+        prev.map((t) => (t.id === currentTab.id ? { ...t, inputValue: '' } : t))
+      );
+      if (currentTab.sessionState === 'remote_session') {
         exitRemoteSession('Interrompido via ^C');
       }
     } else if (e.key === 'l' && e.ctrlKey) {
       e.preventDefault();
-      setLines([]);
+      setTabs((prev) =>
+        prev.map((t) => (t.id === currentTab.id ? { ...t, lines: [] } : t))
+      );
     }
   };
 
   const getPromptPrefix = () => {
-    if (isPasswordInput) {
+    if (currentTab.isPasswordInput) {
       return '';
     }
-    if (sessionState === 'remote_session') {
+    if (currentTab.sessionState === 'remote_session') {
       return '> ';
     }
-    if (shellType === 'bash' || shellType === 'zsh' || shellType === 'sh' || detectedPlatform === 'darwin' || detectedPlatform === 'linux') {
-      const formattedPath = currentPath.replace(/^\/Users\/[^/]+|^\/home\/[^/]+/, '~');
-      return `${currentUsername}@cyberdeck:${formattedPath}$ `;
+    if (
+      currentTab.shellType === 'bash' ||
+      currentTab.shellType === 'zsh' ||
+      currentTab.shellType === 'sh' ||
+      detectedPlatform === 'darwin' ||
+      detectedPlatform === 'linux'
+    ) {
+      const formattedPath = currentTab.currentPath.replace(/^\/Users\/[^/]+|^\/home\/[^/]+/, '~');
+      return `${currentTab.currentUsername}@cyberdeck:${formattedPath}$ `;
     }
-    if (shellType === 'powershell') {
-      return `PS ${currentPath}> `;
+    if (currentTab.shellType === 'powershell') {
+      return `PS ${currentTab.currentPath}> `;
     }
-    return `${currentPath}> `;
+    return `${currentTab.currentPath}> `;
   };
 
   const getPromptColorClass = () => {
-    if (sessionState === 'remote_session') return 'text-cyan-400';
-    if (shellType === 'powershell') return 'text-emerald-400';
-    if (shellType === 'bash' || shellType === 'zsh') return 'text-cyan-300';
+    if (currentTab.sessionState === 'remote_session') return 'text-cyan-400';
+    if (currentTab.shellType === 'powershell') return 'text-emerald-400';
+    if (currentTab.shellType === 'bash' || currentTab.shellType === 'zsh') return 'text-cyan-300';
     return 'text-white';
   };
 
   const getActiveProtocolName = () => {
-    if (sessionState === 'remote_session') return remoteSessionName.toUpperCase();
-    if (shellType === 'bash') return 'GNU BASH';
-    if (shellType === 'zsh') return 'Z SHELL';
-    if (shellType === 'sh') return 'POSIX SH';
-    return shellType === 'powershell' ? 'POWERSHELL' : 'CMD.EXE';
+    if (currentTab.sessionState === 'remote_session') return currentTab.remoteSessionName.toUpperCase();
+    if (currentTab.shellType === 'bash') return 'GNU BASH';
+    if (currentTab.shellType === 'zsh') return 'Z SHELL';
+    if (currentTab.shellType === 'sh') return 'POSIX SH';
+    return currentTab.shellType === 'powershell' ? 'POWERSHELL' : 'CMD.EXE';
   };
 
   // Full inner Cyberdeck UI content
@@ -1082,14 +1473,25 @@ export default function App() {
         crtConfig={crtConfig}
         onCrtConfigChange={updateCrtConfig}
         activeProtocolName={getActiveProtocolName()}
-        sessionState={sessionState}
-        backendConnected={backendConnected}
+        sessionState={currentTab.sessionState}
+        backendConnected={currentTab.backendConnected}
         isBrowserOpen={isBrowserOpen}
         onToggleBrowser={() => setIsBrowserOpen((prev) => !prev)}
       />
 
+      {/* Terminal Multi-Tabs Bar */}
+      <TerminalTabsBar
+        tabs={tabs}
+        activeTabId={activeTabId}
+        theme={theme}
+        onSelectTab={handleSelectTab}
+        onNewTab={() => handleNewTab()}
+        onCloseTab={handleCloseTab}
+        onRenameTab={handleRenameTab}
+      />
+
       {/* Mobile Tab Switcher */}
-      <div className="flex lg:hidden items-center gap-1 mb-2 font-mono text-[11px] shrink-0">
+      <div className="flex lg:hidden items-center gap-1 my-1 font-mono text-[11px] shrink-0">
         <button
           onClick={() => setMobileTab('terminal')}
           className={`flex-1 py-1 rounded border flex items-center justify-center gap-1.5 transition-colors ${
@@ -1133,16 +1535,20 @@ export default function App() {
       </div>
 
       {/* Center Body: Terminal Workspace with Inline Typing + Right Sidebar */}
-      <div className="relative flex-1 flex flex-col lg:flex-row gap-3 min-h-0">
-        {/* Main Terminal Screen */}
+      <div className="relative flex-1 flex flex-col lg:flex-row gap-3 min-h-0 mt-1">
+        {/* Main Terminal Screen of the Active Tab */}
         <div className={`flex-1 flex flex-col min-h-0 ${mobileTab === 'terminal' ? 'flex' : 'hidden lg:flex'}`}>
           <TerminalScreen
-            lines={lines}
-            inputValue={inputValue}
-            isPassword={isPasswordInput}
+            lines={currentTab.lines}
+            inputValue={currentTab.inputValue}
+            isPassword={currentTab.isPasswordInput}
             promptPrefix={getPromptPrefix()}
             promptColorClass={getPromptColorClass()}
-            onInputChange={setInputValue}
+            onInputChange={(val) =>
+              setTabs((prev) =>
+                prev.map((t) => (t.id === currentTab.id ? { ...t, inputValue: val } : t))
+              )
+            }
             onSubmit={executeCommandLine}
             onKeyDown={handleKeyDown}
             crtConfig={crtConfig}
@@ -1150,7 +1556,7 @@ export default function App() {
           />
         </div>
 
-        {/* Sidebar: Quick Sessions (Empty by default) + Real-Time Connection Logs */}
+        {/* Sidebar: Quick Sessions + Real-Time Connection Logs */}
         <aside
           className={`w-full lg:w-80 flex-col gap-3 shrink-0 min-h-0 ${
             mobileTab === 'terminal' ? 'hidden lg:flex' : 'flex'
@@ -1160,7 +1566,8 @@ export default function App() {
           <div className={`${mobileTab === 'sessions' ? 'flex flex-col flex-1' : mobileTab === 'logs' ? 'hidden lg:block' : 'block'}`}>
             <QuickSessionsPanel
               sessions={sessions}
-              onSelectSession={handleSelectQuickSession}
+              onSelectSession={(sess) => handleSelectQuickSession(sess, false)}
+              onSelectSessionInNewTab={(sess) => handleSelectQuickSession(sess, true)}
               onOpenAddModal={() => setIsAddModalOpen(true)}
               onDeleteSession={handleDeleteSession}
             />
@@ -1175,19 +1582,19 @@ export default function App() {
 
       {/* Bottom Hardware Footer */}
       <footer className="mt-2 pt-1 border-t border-zinc-900 flex flex-wrap items-center justify-between text-[10px] opacity-65 tracking-widest font-mono shrink-0">
-        <div>TERMINAL: WINDOWS x64 // CYBERDECK FRONTEND</div>
-        <div>PROTOCOLS: POWERSHELL • CMD • SSH • TELNET • TCP</div>
-        <div>LOG STREAM: ATIVO</div>
+        <div>TERMINAL: WINDOWS x64 // MULTI-TAB ENGINE // ABA: {currentTab.title}</div>
+        <div>PROTOCOLS: POWERSHELL • SSH • TELNET • ICMP • RAW TCP</div>
+        <div>ABAS ATIVAS: {tabs.length}</div>
       </footer>
 
-      {/* Modal to add new Quick Session (Host, IP, Protocol, Port, User) */}
+      {/* Modal to add new Quick Session */}
       <QuickSessionModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSave={handleSaveSession}
       />
 
-      {/* Integrated Cyber-Net Web Browser with Full CRT Filter Inheritance */}
+      {/* Integrated Cyber-Net Web Browser (Alpha) */}
       <IntegratedBrowser
         isOpen={isBrowserOpen}
         onClose={() => setIsBrowserOpen(false)}
@@ -1202,7 +1609,7 @@ export default function App() {
     </div>
   );
 
-  // REAL CRT MODE: Encapsulate the ENTIRE viewport screen inside the cathode tube & bezel chassis
+  // REAL CRT MODE: Encapsulate the ENTIRE viewport screen inside cathode tube & bezel chassis
   if (crtConfig.mode === 'real') {
     const screenElement = (
       <div
