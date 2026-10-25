@@ -14,7 +14,7 @@
 
 O **Cyberdeck CRT Terminal** é um ambiente de terminal completo que une o visual nostálgico dos monitores de fósforo verde/âmbar com recursos modernos de produtividade, gerenciamento de servidores e rede.
 
-Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macOS), **aplicativo nativo Android APK para Tablets** (via Capacitor), **SPA Web portátil** e **arquivo HTML autônomo offline**.
+Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macOS), **aplicativo nativo Android APK para Tablets** (via Capacitor) e **SPA Web**.
 
 ---
 
@@ -26,10 +26,12 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
 * **Notificação de Fundo**: Indicadores visuais na barra de abas avisam quando uma sessão em segundo plano recebe novas saídas de dados.
 * **Gerenciamento Fácil**: Abra abas pelo botão `+ Nova Aba`, atalhos de teclado ou diretamente pelos comandos `tab new`, `tab close` e painel de Acessos Rápidos.
 
-### 🖥️ 2. Simulação CRT & Efeitos Visuais Avançados
-* **Curvatura Esférica do Tubo (Curvature)**: Simulação geométrica do vidro curvo de monitores analógicos antigos.
+### 🖥️ 2. Simulação CRT Avançada, Brilho & Curvatura Ajustável
+* **Controle Dinâmico de Brilho**: Ajuste fino da luminosidade do monitor CRT de 70% a 200% via slider na interface ou comando `brightness <valor>`.
+* **Curvatura do Tubo Regulável**: Intensidade da distorção esférica ajustável de 0% (plano total) até 100% (tubo esférico vintage acentuado) via slider ou comando `curve <0-100>`.
+* **Configurações Unificadas de Tela & Tipografia**: Fontes, tamanhos e espaçamento agora acessíveis diretamente dentro do menu de configurações CRT.
 * **Brilho de Fósforo & Bloom Intenso**: Efeito de irradiação de luz nos caracteres (`Extreme`, `Normal`, `Soft`).
-* **Linhas de Varredura (Scanlines)**: Efeito clássico de tubo de raios catódicos com animação sutil.
+* **Linhas de Varredura (Scanlines & Aperture Grille)**: Efeito clássico de tubo de raios catódicos com subpixels RGB analógicos.
 * **Moldura Vintage (Bezel)**: Carcaça industrial tática ao redor da tela, alternável com um clique.
 * **4 Temas de Cores de Fósforo**:
   * 🟢 **Matrix Green**: O lendário verde fósforo P1 (#00ff66).
@@ -40,11 +42,9 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
   * Fontes: *Share Tech Mono*, *VT323 (DEC VT220)*, *Fira Code* e *JetBrains Mono*.
   * Controle de escala (*Pequena*, *Média*, *Grande*) e espaçamento entre linhas (*Compacto*, *Normal*, *Espaçado*).
 
-### 🔊 3. Motor de Áudio Retrô (Web Audio API)
-* Efeitos sonoros gerados por síntese sonora em tempo real (sem arquivos de áudio pesados).
-* Sons táteis de teclado mecânico vintage ao digitar.
-* Bipes de status e alertas táticos de comando.
-* Som de portadora de modem (*carrier tone / handshake dial-up*) ao disparar comandos de rede.
+### 📊 3. Telemetria Real do Sistema (CPU & Memória RAM)
+* **Monitoramento Real em Tempo Real**: O terminal lê o uso real de CPU e memória RAM do computador em que está rodando diretamente via Node.js (`os.cpus()`, `os.totalmem()`, `os.freemem()`).
+* **Exibição no HUD Superior**: Acompanhe o consumo do hardware enquanto executa comandos pesados ou administra servidores.
 
 ### 🌐 4. Cyber-Net: Navegador Web CRT Embutido *(ALPHA - Em Testes ⚠️)*
 > ⚠️ **Status Alpha / Experimental**: A função de navegador integrado está em estágio inicial (Alpha) e possui bugs conhecidos. Muitos sites modernos utilizam proteções rígidas de incorporação (`X-Frame-Options`, CSP estrito e bloqueios de script) que impedem seu carregamento completo ou causam comportamentos imprevistos. O suporte e contorno dessas restrições estão sendo melhorados a cada versão.
@@ -65,9 +65,6 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
 * **Ping / ICMP Real**: Testes de alcance de pacotes e latência em milissegundos.
 * **Painel de Acessos Rápidos (Quick Sessions)**: Salve conexões frequentes com IP, porta, protocolo e credenciais salvas localmente. Opção de conectar direto na aba atual ou abrir automaticamente em uma nova aba!
 * **Auditoria de Logs em Tempo Real**: Telemetria detalhada de eventos de rede, pacotes TX/RX, conexões e comandos com filtros por nível (`INFO`, `WARN`, `ERROR`, `DATA`, `SUCCESS`).
-
-### 💾 7. Modo Portátil & Offline
-* **cyberdeckterminalv2.html**: Arquivo único empacotado que roda em qualquer navegador moderno sem necessidade de Node.js, internet ou instalação. Basta dar dois cliques.
 
 ---
 

@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, Volume2, VolumeX, Tv, Radio, Sparkles, ChevronDown, Check, Palette, Type, Globe, Download } from 'lucide-react';
+import { Terminal, Tv, Radio, Sparkles, ChevronDown, Check, Palette, Type, Globe, Sun, Sliders, Monitor } from 'lucide-react';
 import {
   TerminalTheme,
   SessionState,
-  CrtMode,
   CrtConfig,
   TypographyConfig,
   TerminalFontFamily,
   TerminalFontSize,
   TerminalLineSpacing,
+  SystemMetrics,
 } from '../types';
 
 interface HeaderHudProps {
@@ -16,13 +16,12 @@ interface HeaderHudProps {
   onThemeChange: (theme: TerminalTheme) => void;
   typographyConfig: TypographyConfig;
   onTypographyConfigChange: (config: Partial<TypographyConfig>) => void;
-  sfxEnabled: boolean;
-  onToggleSfx: () => void;
   crtConfig: CrtConfig;
   onCrtConfigChange: (config: Partial<CrtConfig>) => void;
   activeProtocolName: string;
   sessionState: SessionState;
   backendConnected: boolean;
+  systemMetrics?: SystemMetrics | null;
   isBrowserOpen?: boolean;
   onToggleBrowser?: () => void;
 }
@@ -58,20 +57,18 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
   onThemeChange,
   typographyConfig,
   onTypographyConfigChange,
-  sfxEnabled,
-  onToggleSfx,
   crtConfig,
   onCrtConfigChange,
   activeProtocolName,
   sessionState,
   backendConnected,
+  systemMetrics,
   isBrowserOpen = false,
   onToggleBrowser,
 }) => {
   const [clock, setClock] = useState<string>('00:00:00');
-  const [cpu, setCpu] = useState<number>(8);
-  const [ram, setRam] = useState<number>(185);
   const [isCrtMenuOpen, setIsCrtMenuOpen] = useState<boolean>(false);
+  const [crtSubTab, setCrtSubTab] = useState<'display' | 'typography'>('display');
   const crtMenuRef = useRef<HTMLDivElement>(null);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState<boolean>(false);
   const themeMenuRef = useRef<HTMLDivElement>(null);
@@ -85,11 +82,6 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
     };
     updateTime();
     const clockInterval = setInterval(updateTime, 1000);
-
-    const metricsInterval = setInterval(() => {
-      setCpu(Math.floor(Math.random() * 10 + 4));
-      setRam(Math.floor(Math.random() * 15 + 180));
-    }, 3000);
 
     const handleClickOutside = (e: MouseEvent) => {
       if (crtMenuRef.current && !crtMenuRef.current.contains(e.target as Node)) {
@@ -106,7 +98,6 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
 
     return () => {
       clearInterval(clockInterval);
-      clearInterval(metricsInterval);
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
@@ -121,15 +112,19 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
     }
   };
 
+  // Curvature intensity defaults
+  const currentCurvature = crtConfig.curvature ? (crtConfig.curvatureIntensity ?? 50) : 0;
+  const currentBrightness = crtConfig.brightness ?? 115;
+
   return (
     <header className="flex flex-wrap items-center justify-between border-b crt-glow-box pb-2 mb-2 gap-2 text-xs uppercase tracking-wider shrink-0 relative z-30">
       {/* Brand & Status */}
       <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
         <div className="flex items-center gap-1.5 font-bold tracking-widest text-sm shrink-0">
           <Terminal className="w-4 h-4 text-emerald-400" />
-          <span className="crt-glow font-vt323 text-lg">CYBERDECK // WINDOWS TERMINAL</span>
+          <span className="crt-glow font-vt323 text-lg">CYBERDECK // UNIVERSAL TERMINAL</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded border border-current opacity-70">
-            HOST: WIN32/X64
+            HOST: WIN / LINUX / MAC
           </span>
         </div>
 
@@ -155,15 +150,28 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
         </div>
       </div>
 
-      {/* Quick Metrics HUD */}
+      {/* Quick Metrics HUD: Telemetria Real de CPU e RAM do Sistema */}
       <div className="hidden md:flex items-center gap-3 sm:gap-4 text-[11px] shrink-0">
         <div className="hidden lg:flex items-center gap-1">
           <span className="opacity-60">CPU:</span>
-          <span className="font-bold">{cpu}%</span>
+          {systemMetrics ? (
+            <span className="font-bold text-white crt-glow">
+              {systemMetrics.cpu}%
+            </span>
+          ) : (
+            <span className="font-bold text-zinc-500">--%</span>
+          )}
         </div>
         <div className="hidden lg:flex items-center gap-1">
           <span className="opacity-60">RAM:</span>
-          <span className="font-bold">{ram}MB</span>
+          {systemMetrics ? (
+            <span className="font-bold text-white crt-glow" title={`Uso Real: ${systemMetrics.ramUsedMb}MB de ${systemMetrics.ramTotalMb}MB`}>
+              {(systemMetrics.ramUsedMb / 1024).toFixed(1)}GB
+              <span className="text-[9px] opacity-75 font-normal ml-0.5">({systemMetrics.ramPercent}%)</span>
+            </span>
+          ) : (
+            <span className="font-bold text-zinc-500">--MB</span>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <span className="opacity-60">SHELL:</span>
@@ -192,37 +200,7 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
           </button>
         )}
 
-        {/* Portable HTML v2 Download Button */}
-        <a
-          href="/cyberdeckterminalv2.html"
-          download="cyberdeckterminalv2.html"
-          title="Baixar arquivo HTML Portátil Offline v2 (Todas as funções em um único arquivo)"
-          className="px-2 py-1 rounded border border-current/50 bg-black/60 crt-glow-box hover:bg-emerald-950/40 text-[11px] font-bold flex items-center gap-1 transition-colors text-current"
-        >
-          <Download className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="hidden sm:inline">HTML v2</span>
-        </a>
-
-        {/* Audio Toggle */}
-        <button
-          onClick={onToggleSfx}
-          title="Alternar áudio de teclas"
-          className="px-2 py-1 rounded border crt-glow-box hover:bg-emerald-950/40 text-[11px] flex items-center gap-1 transition-colors"
-        >
-          {sfxEnabled ? (
-            <>
-              <Volume2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">SFX: ON</span>
-            </>
-          ) : (
-            <>
-              <VolumeX className="w-3.5 h-3.5 opacity-60" />
-              <span className="hidden sm:inline opacity-60">SFX: OFF</span>
-            </>
-          )}
-        </button>
-
-        {/* CRT Real Filter Selector & Settings */}
+        {/* CRT Real Filter Selector & Comprehensive Settings */}
         <div className="relative" ref={crtMenuRef}>
           <div className="flex items-center">
             <button
@@ -247,135 +225,390 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
             </button>
             <button
               onClick={() => setIsCrtMenuOpen(!isCrtMenuOpen)}
-              title="Configurações avançadas do CRT"
-              className={`px-1.5 py-1 rounded-r border-y border-r text-[11px] transition-colors ${
+              title="Configurações avançadas do CRT, Brilho, Curvatura e Fontes"
+              className={`px-2 py-1 rounded-r border-y border-r text-[11px] transition-colors flex items-center gap-1 ${
                 crtConfig.mode === 'real'
                   ? 'bg-emerald-950/60 border-emerald-400 text-emerald-300'
                   : 'bg-zinc-900 border-zinc-800 text-zinc-400'
               }`}
             >
+              <Sliders className="w-3 h-3 text-emerald-400" />
               <ChevronDown className="w-3 h-3" />
             </button>
           </div>
 
-          {/* CRT Settings Popover - Aligned left-0 to expand inward safely without bezel clipping */}
+          {/* CRT & Display Settings Popover */}
           {isCrtMenuOpen && (
-            <div className="absolute left-0 mt-2 w-72 max-w-[calc(100vw-3rem)] bg-zinc-950 border border-emerald-500/50 rounded-lg p-3 shadow-2xl z-50 text-[11px] normal-case space-y-3 font-mono backdrop-blur-md">
-              <div className="flex items-center justify-between border-b border-zinc-800 pb-1.5 uppercase font-bold text-emerald-400 tracking-wider">
-                <span className="flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Filtro CRT Retro
-                </span>
-                <span className="text-[10px] opacity-70">Cool-Retro-Term</span>
-              </div>
+            <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-2.5rem)] bg-zinc-950/98 border border-emerald-500/60 rounded-lg p-3.5 shadow-2xl z-50 text-[11px] normal-case space-y-3 font-mono backdrop-blur-md max-h-[85vh] overflow-y-auto cyber-scrollbar">
+              {/* Header with Sub-tabs */}
+              <div className="border-b border-zinc-800 pb-2">
+                <div className="flex items-center justify-between uppercase font-bold text-emerald-400 tracking-wider mb-2">
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    Configurações de Tela CRT
+                  </span>
+                  <span className="text-[10px] opacity-70">Cool-Retro-Term</span>
+                </div>
 
-              {/* Mode Select */}
-              <div className="space-y-1">
-                <span className="text-zinc-400 text-[10px] uppercase font-bold">Modo de Exibição</span>
-                <div className="grid grid-cols-3 gap-1">
+                {/* Internal Tabs: Display & Curvature vs Typography */}
+                <div className="flex gap-1 bg-black/60 p-0.5 rounded border border-zinc-800">
                   <button
-                    onClick={() => onCrtConfigChange({ mode: 'real' })}
-                    className={`py-1.5 px-1 rounded text-center font-bold border transition-all ${
-                      crtConfig.mode === 'real'
-                        ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300'
-                        : 'border-zinc-800 text-zinc-400 hover:bg-zinc-900'
+                    onClick={() => setCrtSubTab('display')}
+                    className={`flex-1 py-1 px-2 rounded text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all ${
+                      crtSubTab === 'display'
+                        ? 'bg-emerald-500/25 border border-emerald-400/80 text-emerald-300 shadow-sm'
+                        : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
-                    Tubo Real
+                    <Monitor className="w-3 h-3" />
+                    <span>CRT & BRILHO</span>
                   </button>
                   <button
-                    onClick={() => onCrtConfigChange({ mode: 'subtle' })}
-                    className={`py-1.5 px-1 rounded text-center font-bold border transition-all ${
-                      crtConfig.mode === 'subtle'
-                        ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300'
-                        : 'border-zinc-800 text-zinc-400 hover:bg-zinc-900'
+                    onClick={() => setCrtSubTab('typography')}
+                    className={`flex-1 py-1 px-2 rounded text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all ${
+                      crtSubTab === 'typography'
+                        ? 'bg-emerald-500/25 border border-emerald-400/80 text-emerald-300 shadow-sm'
+                        : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
-                    Leve
-                  </button>
-                  <button
-                    onClick={() => onCrtConfigChange({ mode: 'off' })}
-                    className={`py-1.5 px-1 rounded text-center font-bold border transition-all ${
-                      crtConfig.mode === 'off'
-                        ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300'
-                        : 'border-zinc-800 text-zinc-400 hover:bg-zinc-900'
-                    }`}
-                  >
-                    Off
+                    <Type className="w-3 h-3" />
+                    <span>FONTES & TEXTO</span>
                   </button>
                 </div>
               </div>
 
-              {/* Bloom / Glow Level */}
-              <div className="space-y-1">
-                <span className="text-zinc-400 text-[10px] uppercase font-bold">Brilho do Fósforo (Bloom)</span>
-                <div className="grid grid-cols-3 gap-1">
-                  <button
-                    onClick={() => onCrtConfigChange({ bloom: 'extreme' })}
-                    className={`py-1 rounded text-center border ${
-                      crtConfig.bloom === 'extreme'
-                        ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300 font-bold'
-                        : 'border-zinc-800 text-zinc-400'
-                    }`}
-                  >
-                    Extremo
-                  </button>
-                  <button
-                    onClick={() => onCrtConfigChange({ bloom: 'normal' })}
-                    className={`py-1 rounded text-center border ${
-                      crtConfig.bloom === 'normal'
-                        ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300 font-bold'
-                        : 'border-zinc-800 text-zinc-400'
-                    }`}
-                  >
-                    Normal
-                  </button>
-                  <button
-                    onClick={() => onCrtConfigChange({ bloom: 'soft' })}
-                    className={`py-1 rounded text-center border ${
-                      crtConfig.bloom === 'soft'
-                        ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300 font-bold'
-                        : 'border-zinc-800 text-zinc-400'
-                    }`}
-                  >
-                    Suave
-                  </button>
+              {crtSubTab === 'display' ? (
+                <>
+                  {/* Mode Select */}
+                  <div className="space-y-1">
+                    <span className="text-zinc-400 text-[10px] uppercase font-bold">Modo de Exibição</span>
+                    <div className="grid grid-cols-3 gap-1">
+                      <button
+                        onClick={() => onCrtConfigChange({ mode: 'real' })}
+                        className={`py-1.5 px-1 rounded text-center font-bold border transition-all ${
+                          crtConfig.mode === 'real'
+                            ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300'
+                            : 'border-zinc-800 text-zinc-400 hover:bg-zinc-900'
+                        }`}
+                      >
+                        Tubo Real
+                      </button>
+                      <button
+                        onClick={() => onCrtConfigChange({ mode: 'subtle' })}
+                        className={`py-1.5 px-1 rounded text-center font-bold border transition-all ${
+                          crtConfig.mode === 'subtle'
+                            ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300'
+                            : 'border-zinc-800 text-zinc-400 hover:bg-zinc-900'
+                        }`}
+                      >
+                        Leve
+                      </button>
+                      <button
+                        onClick={() => onCrtConfigChange({ mode: 'off' })}
+                        className={`py-1.5 px-1 rounded text-center font-bold border transition-all ${
+                          crtConfig.mode === 'off'
+                            ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300'
+                            : 'border-zinc-800 text-zinc-400 hover:bg-zinc-900'
+                        }`}
+                      >
+                        Off
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 1. Brightness Configuration (Nova função solicitada) */}
+                  <div className="space-y-1.5 pt-1 border-t border-zinc-900">
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-300 text-[10px] uppercase font-bold flex items-center gap-1">
+                        <Sun className="w-3.5 h-3.5 text-amber-400" />
+                        Brilho da Tela CRT
+                      </span>
+                      <span className="text-emerald-400 font-bold font-mono">
+                        {currentBrightness}%
+                      </span>
+                    </div>
+
+                    {/* Brightness Slider */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onCrtConfigChange({ brightness: Math.max(70, currentBrightness - 10) })}
+                        className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white font-bold"
+                        title="Diminuir brilho em 10%"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="range"
+                        min="70"
+                        max="200"
+                        step="5"
+                        value={currentBrightness}
+                        onChange={(e) => onCrtConfigChange({ brightness: Number(e.target.value) })}
+                        className="flex-1 accent-emerald-400 cursor-pointer h-1.5 bg-zinc-800 rounded-lg"
+                      />
+                      <button
+                        onClick={() => onCrtConfigChange({ brightness: Math.min(200, currentBrightness + 10) })}
+                        className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white font-bold"
+                        title="Aumentar brilho em 10%"
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    {/* Quick Brightness Presets */}
+                    <div className="grid grid-cols-5 gap-1 pt-0.5">
+                      {[
+                        { label: '80%', val: 80 },
+                        { label: '100%', val: 100 },
+                        { label: '120%', val: 120 },
+                        { label: '150%', val: 150 },
+                        { label: '180%', val: 180 },
+                      ].map((item) => (
+                        <button
+                          key={item.val}
+                          onClick={() => onCrtConfigChange({ brightness: item.val })}
+                          className={`py-0.5 rounded text-[10px] border text-center transition-all ${
+                            currentBrightness === item.val
+                              ? 'border-emerald-400 bg-emerald-500/25 text-emerald-300 font-bold'
+                              : 'border-zinc-800 text-zinc-400 hover:bg-zinc-900'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 2. Curvature Configuration (Nova função ajustável solicitada) */}
+                  <div className="space-y-1.5 pt-1 border-t border-zinc-900">
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-300 text-[10px] uppercase font-bold flex items-center gap-1">
+                        <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+                        Curvatura do Tubo CRT
+                      </span>
+                      <span className="text-cyan-400 font-bold font-mono">
+                        {currentCurvature === 0 ? 'DESLIGADA' : `${currentCurvature}%`}
+                      </span>
+                    </div>
+
+                    {/* Curvature Slider */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const nextVal = Math.max(0, currentCurvature - 10);
+                          onCrtConfigChange({
+                            curvatureIntensity: nextVal,
+                            curvature: nextVal > 0,
+                          });
+                        }}
+                        className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white font-bold"
+                        title="Diminuir curvatura"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="5"
+                        value={currentCurvature}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          onCrtConfigChange({
+                            curvatureIntensity: val,
+                            curvature: val > 0,
+                          });
+                        }}
+                        className="flex-1 accent-cyan-400 cursor-pointer h-1.5 bg-zinc-800 rounded-lg"
+                      />
+                      <button
+                        onClick={() => {
+                          const nextVal = Math.min(100, currentCurvature + 10);
+                          onCrtConfigChange({
+                            curvatureIntensity: nextVal,
+                            curvature: nextVal > 0,
+                          });
+                        }}
+                        className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white font-bold"
+                        title="Aumentar curvatura"
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    {/* Curvature Presets */}
+                    <div className="grid grid-cols-4 gap-1 pt-0.5">
+                      {[
+                        { label: 'Plano (0%)', val: 0 },
+                        { label: 'Suave (30%)', val: 30 },
+                        { label: 'Clássico (50%)', val: 50 },
+                        { label: 'Extremo (100%)', val: 100 },
+                      ].map((preset) => (
+                        <button
+                          key={preset.val}
+                          onClick={() =>
+                            onCrtConfigChange({
+                              curvatureIntensity: preset.val,
+                              curvature: preset.val > 0,
+                            })
+                          }
+                          className={`py-0.5 px-1 rounded text-[9px] border text-center transition-all truncate ${
+                            currentCurvature === preset.val
+                              ? 'border-cyan-400 bg-cyan-500/25 text-cyan-200 font-bold'
+                              : 'border-zinc-800 text-zinc-400 hover:bg-zinc-900'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Bloom / Glow Level */}
+                  <div className="space-y-1 pt-1 border-t border-zinc-900">
+                    <span className="text-zinc-400 text-[10px] uppercase font-bold">Brilho do Fósforo (Bloom)</span>
+                    <div className="grid grid-cols-3 gap-1">
+                      <button
+                        onClick={() => onCrtConfigChange({ bloom: 'extreme' })}
+                        className={`py-1 rounded text-center border ${
+                          crtConfig.bloom === 'extreme'
+                            ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300 font-bold'
+                            : 'border-zinc-800 text-zinc-400'
+                        }`}
+                      >
+                        Extremo
+                      </button>
+                      <button
+                        onClick={() => onCrtConfigChange({ bloom: 'normal' })}
+                        className={`py-1 rounded text-center border ${
+                          crtConfig.bloom === 'normal'
+                            ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300 font-bold'
+                            : 'border-zinc-800 text-zinc-400'
+                        }`}
+                      >
+                        Normal
+                      </button>
+                      <button
+                        onClick={() => onCrtConfigChange({ bloom: 'soft' })}
+                        className={`py-1 rounded text-center border ${
+                          crtConfig.bloom === 'soft'
+                            ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300 font-bold'
+                            : 'border-zinc-800 text-zinc-400'
+                        }`}
+                      >
+                        Suave
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Toggles */}
+                  <div className="space-y-2 pt-1 border-t border-zinc-900 text-zinc-300 text-[11px]">
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <span>Moldura de Monitor Vintage (Bezel)</span>
+                      <input
+                        type="checkbox"
+                        checked={crtConfig.bezel}
+                        onChange={(e) => onCrtConfigChange({ bezel: e.target.checked })}
+                        className="accent-emerald-500 rounded cursor-pointer"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <span>Grade de Fósforo (Aperture Grille)</span>
+                      <input
+                        type="checkbox"
+                        checked={crtConfig.scanlines}
+                        onChange={(e) => onCrtConfigChange({ scanlines: e.target.checked })}
+                        className="accent-emerald-500 rounded cursor-pointer"
+                      />
+                    </label>
+                  </div>
+                </>
+              ) : (
+                /* Typography Section inside CRT Config Modal */
+                <div className="space-y-3">
+                  {/* 1. Font Family */}
+                  <div className="space-y-1">
+                    <span className="text-zinc-400 text-[10px] uppercase font-bold">1. Família da Fonte</span>
+                    <div className="space-y-1">
+                      {FONTS.map((f) => {
+                        const isSelected = typographyConfig.family === f.id;
+                        return (
+                          <button
+                            key={f.id}
+                            onClick={() => onTypographyConfigChange({ family: f.id })}
+                            className={`w-full px-2.5 py-1.5 rounded flex items-center justify-between text-left border transition-all ${
+                              isSelected
+                                ? 'border-emerald-400 bg-emerald-500/20 font-bold text-emerald-300 shadow-sm'
+                                : 'border-zinc-800 text-zinc-400 hover:bg-zinc-900'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`text-sm ${f.fontClass} tracking-wide truncate`}>
+                                {f.name}
+                              </span>
+                              <span className="text-[9px] px-1 py-0.2 rounded border border-current opacity-70 uppercase shrink-0">
+                                {f.tag}
+                              </span>
+                            </div>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 2. Font Size */}
+                  <div className="space-y-1 pt-1 border-t border-zinc-900">
+                    <span className="text-zinc-400 text-[10px] uppercase font-bold">2. Tamanho da Fonte</span>
+                    <div className="grid grid-cols-3 gap-1">
+                      {FONT_SIZES.map((s) => {
+                        const isSelected = typographyConfig.size === s.id;
+                        return (
+                          <button
+                            key={s.id}
+                            onClick={() => onTypographyConfigChange({ size: s.id })}
+                            className={`py-1.5 px-1 rounded text-center border transition-all ${
+                              isSelected
+                                ? 'border-emerald-400 bg-emerald-500/20 font-bold text-emerald-300'
+                                : 'border-zinc-800 text-zinc-400 hover:bg-zinc-900'
+                            }`}
+                          >
+                            <div className="text-[11px] font-bold">{s.label}</div>
+                            <div className="text-[9px] opacity-65">{s.px}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 3. Line Spacing */}
+                  <div className="space-y-1 pt-1 border-t border-zinc-900">
+                    <span className="text-zinc-400 text-[10px] uppercase font-bold">3. Espaço entre Linhas</span>
+                    <div className="grid grid-cols-3 gap-1">
+                      {LINE_SPACINGS.map((sp) => {
+                        const isSelected = typographyConfig.spacing === sp.id;
+                        return (
+                          <button
+                            key={sp.id}
+                            onClick={() => onTypographyConfigChange({ spacing: sp.id })}
+                            className={`py-1.5 px-1 rounded text-center border transition-all ${
+                              isSelected
+                                ? 'border-emerald-400 bg-emerald-500/20 font-bold text-emerald-300'
+                                : 'border-zinc-800 text-zinc-400 hover:bg-zinc-900'
+                            }`}
+                          >
+                            <div className="text-[11px] font-bold">{sp.label}</div>
+                            <div className="text-[9px] opacity-65">{sp.factor}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Toggles */}
-              <div className="space-y-2 pt-1 border-t border-zinc-900 text-zinc-300 text-[11px]">
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span>Moldura de Monitor Vintage (Bezel)</span>
-                  <input
-                    type="checkbox"
-                    checked={crtConfig.bezel}
-                    onChange={(e) => onCrtConfigChange({ bezel: e.target.checked })}
-                    className="accent-emerald-500 rounded cursor-pointer"
-                  />
-                </label>
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span>Curvatura Esférica do Tubo</span>
-                  <input
-                    type="checkbox"
-                    checked={crtConfig.curvature}
-                    onChange={(e) => onCrtConfigChange({ curvature: e.target.checked })}
-                    className="accent-emerald-500 rounded cursor-pointer"
-                  />
-                </label>
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span>Grade de Fósforo (Aperture Grille)</span>
-                  <input
-                    type="checkbox"
-                    checked={crtConfig.scanlines}
-                    onChange={(e) => onCrtConfigChange({ scanlines: e.target.checked })}
-                    className="accent-emerald-500 rounded cursor-pointer"
-                  />
-                </label>
-              </div>
-
-              <div className="text-[10px] text-zinc-500 italic text-center pt-1">
-                Dica: digite <span className="text-emerald-400">crt real</span> no terminal para alternar
+              <div className="text-[10px] text-zinc-500 italic text-center pt-1 border-t border-zinc-900">
+                Comandos de terminal: <span className="text-emerald-400 font-bold">crt real</span> • <span className="text-emerald-400 font-bold">brightness 150</span> • <span className="text-emerald-400 font-bold">curve 70</span>
               </div>
             </div>
           )}
@@ -443,7 +676,7 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
           )}
         </div>
 
-        {/* Custom Retro Typography (Font, Size & Line Spacing) Selector */}
+        {/* Quick Typography Button (Também mantido no header para acesso rápido) */}
         <div className="relative" ref={typoMenuRef}>
           <button
             onClick={() => {
@@ -478,7 +711,7 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
                 <span className="text-[10px] opacity-70">4 Fontes • 3 Tamanhos</span>
               </div>
 
-              {/* 1. Font Family Selection (4 curated themes) */}
+              {/* 1. Font Family */}
               <div className="space-y-1">
                 <span className="text-[10px] uppercase font-bold opacity-70">1. Família da Fonte</span>
                 <div className="space-y-1">
@@ -509,7 +742,7 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
                 </div>
               </div>
 
-              {/* 2. Font Size (3 options: Pequena, Média, Grande) */}
+              {/* 2. Font Size */}
               <div className="space-y-1">
                 <span className="text-[10px] uppercase font-bold opacity-70">2. Tamanho da Fonte</span>
                 <div className="grid grid-cols-3 gap-1">
@@ -533,7 +766,7 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
                 </div>
               </div>
 
-              {/* 3. Line Spacing (3 options: Compacto, Normal, Espaçado) */}
+              {/* 3. Line Spacing */}
               <div className="space-y-1">
                 <span className="text-[10px] uppercase font-bold opacity-70">3. Espaço entre Linhas</span>
                 <div className="grid grid-cols-3 gap-1">
@@ -555,10 +788,6 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
                     );
                   })}
                 </div>
-              </div>
-
-              <div className="text-[10px] opacity-60 italic text-center pt-1 border-t border-white/10">
-                Comandos: <span className="font-bold">font</span>, <span className="font-bold">font size lg</span>, <span className="font-bold">font space tight</span>
               </div>
             </div>
           )}

@@ -11,6 +11,10 @@
   --term-bg: #030a05;
   --panel-border: rgba(0, 255, 102, 0.35);
   --scanline-opacity: 0.28;
+  --crt-brightness: 1.15;
+  --crt-perspective: 1200px;
+  --crt-scale: 0.992;
+  --crt-radius: 20px;
 }
 
 [data-theme="amber"] {
@@ -221,8 +225,16 @@ body[data-theme="magenta"] .crt-real-screen {
 
 /* Barrel Distortion / Spherical Curvature Effect */
 .crt-barrel-warp {
-  transform: perspective(1200px) scale(0.992);
+  transform: perspective(var(--crt-perspective, 1200px)) scale(var(--crt-scale, 0.992));
   transform-origin: center center;
+  border-radius: var(--crt-radius, 20px) !important;
+  transition: transform 0.2s ease, border-radius 0.2s ease;
+}
+
+/* Dynamic CRT Screen Brightness Filter */
+.crt-brightness-layer {
+  filter: brightness(var(--crt-brightness, 1.15));
+  transition: filter 0.2s ease;
 }
 
 /* CRT Heavy Raster Scanlines */

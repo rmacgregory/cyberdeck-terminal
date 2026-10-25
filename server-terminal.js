@@ -57,6 +57,46 @@ function processTelnetNegotiation(socket, chunk) {
   return Buffer.from(cleanBytes).toString('utf-8');
 }
 
+let prevCpuTimes = null;
+
+function getSystemMetrics() {
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const usedMem = totalMem - freeMem;
+  const ramPercent = Math.round((usedMem / totalMem) * 100);
+  const ramUsedMb = Math.round(usedMem / (1024 * 1024));
+  const ramTotalMb = Math.round(totalMem / (1024 * 1024));
+
+  const cpus = os.cpus() || [];
+  let idle = 0;
+  let total = 0;
+  for (const cpu of cpus) {
+    for (const type in cpu.times) {
+      total += cpu.times[type];
+    }
+    idle += cpu.times.idle;
+  }
+
+  let cpuPercent = 0;
+  if (prevCpuTimes && total > prevCpuTimes.total) {
+    const idleDiff = idle - prevCpuTimes.idle;
+    const totalDiff = total - prevCpuTimes.total;
+    cpuPercent = Math.max(0, Math.min(100, Math.round((1 - idleDiff / totalDiff) * 100)));
+  }
+  prevCpuTimes = { idle, total };
+
+  return {
+    cpu: cpuPercent,
+    ramUsedMb,
+    ramTotalMb,
+    ramPercent,
+    cores: cpus.length,
+    uptime: Math.round(os.uptime()),
+    hostname: os.hostname(),
+    platform: process.platform,
+  };
+}
+
 /**
  * Inicia o servidor backend
  * @param {object} options
@@ -68,6 +108,23 @@ export function startTerminalServer(options = {}) {
   const quiet = options.quiet || false;
 
   const server = http.createServer((req, res) => {
+    // Habilita CORS
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    if (req.url === '/api/system-metrics' || req.url === '/api/metrics') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(getSystemMetrics()));
+      return;
+    }
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       status: 'online',
@@ -76,10 +133,27 @@ export function startTerminalServer(options = {}) {
       system: os.type(),
       release: os.release(),
       hostname: os.hostname(),
+      metrics: getSystemMetrics(),
     }));
   });
 
   const wss = new WebSocketServer({ server });
+
+  // Stream periódico de telemetria real do sistema para todos os clientes conectados
+  const metricsTimer = setInterval(() => {
+    if (wss.clients.size === 0) return;
+    const metrics = getSystemMetrics();
+    const payload = JSON.stringify({
+      type: 'system_metrics',
+      data: metrics,
+      timestamp: new Date().toISOString(),
+    });
+    for (const client of wss.clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(payload);
+      }
+    }
+  }, 1800);
 
   if (!quiet) {
     console.log('====================================================');

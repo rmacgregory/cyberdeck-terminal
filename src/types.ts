@@ -44,9 +44,20 @@ export interface CrtConfig {
   mode: CrtMode;
   bloom: 'extreme' | 'normal' | 'soft';
   curvature: boolean;
+  curvatureIntensity: number; // 0 a 100%
+  brightness: number; // 70 a 200%
   bezel: boolean;
   scanlines: boolean;
   jitter: boolean;
+}
+
+export interface SystemMetrics {
+  cpu: number;
+  ramUsedMb: number;
+  ramTotalMb: number;
+  ramPercent: number;
+  cores?: number;
+  uptime?: number;
 }
 
 export type TerminalFontSize = 'sm' | 'md' | 'lg';

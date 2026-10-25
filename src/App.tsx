@@ -16,8 +16,8 @@ import {
   TerminalLineSpacing,
   TerminalFontFamily,
   TerminalTab,
+  SystemMetrics,
 } from './types';
-import { RetroAudioEngine } from './utils/audio';
 import { HeaderHud } from './components/HeaderHud';
 import { TerminalTabsBar } from './components/TerminalTabsBar';
 import { TerminalScreen } from './components/TerminalScreen';
@@ -51,6 +51,8 @@ export default function App() {
       mode: 'real',
       bloom: 'extreme',
       curvature: true,
+      curvatureIntensity: 50,
+      brightness: 115,
       bezel: true,
       scanlines: true,
       jitter: false,
@@ -71,7 +73,8 @@ export default function App() {
     };
   });
 
-  const [sfxEnabled, setSfxEnabled] = useState<boolean>(true);
+  // Telemetria Real do Sistema (CPU e RAM)
+  const [systemMetrics, setSystemMetrics] = useState<SystemMetrics | null>(null);
   const [mobileTab, setMobileTab] = useState<'terminal' | 'sessions' | 'logs'>('terminal');
 
   // Integrated Cyber-Net Web Browser (Alpha)
@@ -193,9 +196,6 @@ export default function App() {
   // Real-time Connection Logs
   const [logs, setLogs] = useState<ConnectionLog[]>([]);
 
-  // Retro Audio Engine
-  const audioRef = useRef<RetroAudioEngine>(new RetroAudioEngine());
-
   // Add Log helper
   const addLog = (
     level: ConnectionLog['level'],
@@ -289,12 +289,11 @@ export default function App() {
       };
 
       socket.onmessage = (event) => {
-        if (tabId === activeTabIdRef.current) {
-          audioRef.current.playKeyClick();
-        }
         try {
           const data = JSON.parse(event.data);
-          if (data.type === 'init') {
+          if (data.type === 'system_metrics' && data.data) {
+            setSystemMetrics(data.data);
+          } else if (data.type === 'init') {
             setTabs((prev) =>
               prev.map((t) => {
                 if (t.id === tabId) {
@@ -414,7 +413,6 @@ export default function App() {
     setTabs((prev) =>
       prev.map((t) => (t.id === id ? { ...t, hasUnread: false } : t))
     );
-    audioRef.current.playKeyClick();
   };
 
   // Create New Tab
@@ -425,12 +423,15 @@ export default function App() {
       (sessionToLaunch
         ? `${sessionToLaunch.protocol}: ${sessionToLaunch.name || sessionToLaunch.ip}`
         : `Console ${tabs.length + 1}`);
-    const initialProto = sessionToLaunch ? sessionToLaunch.protocol : 'LOCAL';
+    const proto = sessionToLaunch?.protocol;
+    const initialProto: 'LOCAL' | 'SSH' | 'TELNET' | 'PING' | 'RAW' =
+      proto === 'SSH' || proto === 'TELNET' || proto === 'PING' || proto === 'RAW'
+        ? proto
+        : 'LOCAL';
     const newTab = createNewTab(newId, newTitle, initialProto, sessionToLaunch?.ip);
 
     setTabs((prev) => [...prev, newTab]);
     setActiveTabId(newId);
-    audioRef.current.playBeep(1400, 0.08);
 
     // Conecta o socket dedicado para esta nova aba
     connectTabSocket(newId, backendUrl);
@@ -470,7 +471,6 @@ export default function App() {
         setActiveTabId(nextActive.id);
       }
     }
-    audioRef.current.playKeyClick();
   };
 
   // Rename Tab
@@ -491,12 +491,19 @@ export default function App() {
     // Auto-connect initial tab
     connectTabSocket('tab-1', backendUrl);
 
-    const handleFirstClick = () => {
-      audioRef.current.initContext();
-      window.removeEventListener('click', handleFirstClick);
+    // Consulta inicial das métricas reais do sistema
+    const fetchInitialMetrics = async () => {
+      try {
+        const res = await fetch('http://127.0.0.1:3001/api/system-metrics');
+        if (res.ok) {
+          const data = await res.json();
+          setSystemMetrics(data);
+        }
+      } catch {
+        // Backend offline ainda
+      }
     };
-    window.addEventListener('click', handleFirstClick);
-    return () => window.removeEventListener('click', handleFirstClick);
+    fetchInitialMetrics();
   }, []);
 
   // Global Keyboard Shortcuts (Alt+T, Alt+W, Alt+1..9)
@@ -528,19 +535,28 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleGlobalShortcuts);
   }, [tabs]);
 
+  // Sincroniza dinamicamente as variáveis CSS de Brilho e Curvatura do Tubo CRT
+  useEffect(() => {
+    const brightnessVal = (crtConfig.brightness ?? 115) / 100;
+    const curveIntensity = crtConfig.curvature ? (crtConfig.curvatureIntensity ?? 50) : 0;
+
+    // Curvatura: 0% = plano (sem distorção); 50% = clássico retro; 100% = tubo esférico extremo
+    const perspective = curveIntensity === 0 ? 99999 : Math.round(2000 - (curveIntensity / 100) * 1550);
+    const scale = (1 - (curveIntensity / 100) * 0.032).toFixed(3);
+    const radius = Math.round(4 + (curveIntensity / 100) * 36);
+
+    document.documentElement.style.setProperty('--crt-brightness', String(brightnessVal));
+    document.documentElement.style.setProperty('--crt-perspective', `${perspective}px`);
+    document.documentElement.style.setProperty('--crt-scale', String(scale));
+    document.documentElement.style.setProperty('--crt-radius', `${radius}px`);
+  }, [crtConfig.brightness, crtConfig.curvature, crtConfig.curvatureIntensity]);
+
   // Update theme on body
   const handleThemeChange = (newTheme: TerminalTheme) => {
     setTheme(newTheme);
     document.body.setAttribute('data-theme', newTheme);
     appendLine(`[+] Paleta CRT atualizada para: ${newTheme.toUpperCase()}`, 'success');
     addLog('INFO', 'CONFIG', `Tema CRT alterado para ${newTheme.toUpperCase()}`);
-  };
-
-  const handleToggleSfx = () => {
-    const next = !sfxEnabled;
-    setSfxEnabled(next);
-    audioRef.current.enabled = next;
-    appendLine(`[*] Áudio de teclas ${next ? 'ATIVADO' : 'DESATIVADO'}`, 'info');
   };
 
   const updateCrtConfig = (newVals: Partial<CrtConfig>) => {
@@ -594,7 +610,6 @@ export default function App() {
     } catch {
       // Ignore
     }
-    audioRef.current.playBeep(1100, 0.08);
     appendLine(
       `[+] Novo acesso rápido salvo: ${created.name} (${created.protocol} -> ${created.ip})`,
       'success'
@@ -985,15 +1000,33 @@ export default function App() {
       return;
     }
 
-    if (cmd === 'download' || cmd === 'baixar' || cmd === 'html') {
-      appendLine('[+] Baixando arquivo portátil offline atualizado: cyberdeckterminalv2.html', 'success');
-      if (typeof window !== 'undefined') {
-        const a = document.createElement('a');
-        a.href = '/cyberdeckterminalv2.html';
-        a.download = 'cyberdeckterminalv2.html';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+    if (cmd === 'brightness' || cmd === 'brilho') {
+      const val = parseInt(args[0], 10);
+      if (!isNaN(val) && val >= 50 && val <= 250) {
+        updateCrtConfig({ brightness: val });
+        appendLine(`[*] Brilho da tela CRT ajustado para: ${val}%`, 'success');
+      } else {
+        appendLine(`[*] Brilho atual: ${crtConfig.brightness ?? 115}%`, 'info');
+        appendLine('Uso: brightness <70 - 200> (ex: brightness 150)', 'dim');
+      }
+      return;
+    }
+
+    if (cmd === 'curve' || cmd === 'curva' || cmd === 'curvatura') {
+      const sub = args[0]?.toLowerCase();
+      if (sub === 'off' || sub === 'desligar' || sub === '0') {
+        updateCrtConfig({ curvature: false, curvatureIntensity: 0 });
+        appendLine('[*] Curvatura do tubo CRT DESLIGADA (Tela plana)', 'info');
+        return;
+      }
+      const val = parseInt(args[0], 10);
+      if (!isNaN(val) && val >= 0 && val <= 100) {
+        updateCrtConfig({ curvature: val > 0, curvatureIntensity: val });
+        appendLine(`[*] Curvatura do tubo CRT ajustada para: ${val}%`, 'success');
+      } else {
+        const curVal = crtConfig.curvature ? (crtConfig.curvatureIntensity ?? 50) : 0;
+        appendLine(`[*] Curvatura atual: ${curVal}%`, 'info');
+        appendLine('Uso: curve <0 - 100> (ex: curve 70 | curve off)', 'dim');
       }
       return;
     }
@@ -1163,7 +1196,6 @@ export default function App() {
   };
 
   const handlePingDispatch = (target: string) => {
-    audioRef.current.playCarrierTone();
     appendLine(`Disparando ${target} com 32 bytes de dados:`, 'info');
     addLog('CONNECT', 'ICMP', `Iniciando teste de conectividade com ${target}`, target);
 
@@ -1300,8 +1332,6 @@ export default function App() {
 
   // Keyboard navigation & Enter submission on the active tab
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    audioRef.current.playKeyClick();
-
     if (e.key === 'Enter') {
       e.preventDefault();
       const current = currentTab.inputValue;
@@ -1468,13 +1498,12 @@ export default function App() {
         onThemeChange={handleThemeChange}
         typographyConfig={typographyConfig}
         onTypographyConfigChange={handleTypographyConfigChange}
-        sfxEnabled={sfxEnabled}
-        onToggleSfx={handleToggleSfx}
         crtConfig={crtConfig}
         onCrtConfigChange={updateCrtConfig}
         activeProtocolName={getActiveProtocolName()}
         sessionState={currentTab.sessionState}
         backendConnected={currentTab.backendConnected}
+        systemMetrics={systemMetrics}
         isBrowserOpen={isBrowserOpen}
         onToggleBrowser={() => setIsBrowserOpen((prev) => !prev)}
       />
@@ -1613,7 +1642,7 @@ export default function App() {
   if (crtConfig.mode === 'real') {
     const screenElement = (
       <div
-        className={`crt-real-screen flex-1 flex flex-col min-h-0 w-full h-full relative overflow-hidden p-2 sm:p-3 md:p-4 ${
+        className={`crt-real-screen crt-brightness-layer flex-1 flex flex-col min-h-0 w-full h-full relative overflow-hidden p-2 sm:p-3 md:p-4 ${
           crtConfig.curvature ? 'crt-barrel-warp' : ''
         }`}
       >
@@ -1650,7 +1679,7 @@ export default function App() {
   // SUBTLE CRT MODE: Scanline overlay on monitor background
   if (crtConfig.mode === 'subtle') {
     return (
-      <div className="w-full h-screen flex flex-col p-2 sm:p-4 crt-monitor overflow-hidden select-text relative">
+      <div className="w-full h-screen flex flex-col p-2 sm:p-4 crt-monitor crt-brightness-layer overflow-hidden select-text relative">
         <div className="crt-overlay"></div>
         {appContent}
       </div>
@@ -1659,7 +1688,7 @@ export default function App() {
 
   // CRT OFF: Clean flat display
   return (
-    <div className="w-full h-screen flex flex-col p-2 sm:p-4 bg-[#07090b] text-zinc-100 overflow-hidden select-text">
+    <div className="w-full h-screen flex flex-col p-2 sm:p-4 bg-[#07090b] crt-brightness-layer text-zinc-100 overflow-hidden select-text">
       {appContent}
     </div>
   );
