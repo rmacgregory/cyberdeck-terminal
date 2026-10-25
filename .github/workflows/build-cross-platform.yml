@@ -12,6 +12,9 @@ on:
         required: false
         default: 'v1.0.0'
   push:
+    branches:
+      - main
+      - master
     tags:
       - 'v*'
 
