@@ -73,6 +73,16 @@ export const QuickSessionsPanel: React.FC<QuickSessionsPanelProps> = ({
                   <span className={`px-1 py-0.2 rounded border text-[9px] font-mono ${getProtocolBadge(item.protocol)}`}>
                     {item.protocol}
                   </span>
+                  {item.authType === 'key' && (
+                    <span className="px-1 py-0.2 rounded border text-[8px] font-mono text-emerald-400 border-emerald-500/40 bg-emerald-950/40">
+                      CHAVE
+                    </span>
+                  )}
+                  {item.deviceType && item.deviceType !== 'auto' && (
+                    <span className="px-1 py-0.2 rounded border text-[8px] font-mono text-zinc-400 border-zinc-800 bg-zinc-900 uppercase">
+                      {item.deviceType}
+                    </span>
+                  )}
                   <span className="truncate text-zinc-100">{item.name}</span>
                 </div>
                 <div className="text-[10px] opacity-60 font-mono truncate mt-0.5">

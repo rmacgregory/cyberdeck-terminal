@@ -19,6 +19,10 @@ export interface QuickSession {
   port?: number;
   protocol: ProtocolType;
   user?: string;
+  authType?: 'password' | 'key';
+  privateKey?: string; // PEM / OpenSSH format
+  passphrase?: string;
+  deviceType?: 'auto' | 'cisco' | 'mikrotik' | 'huawei' | 'juniper' | 'linux' | 'windows';
 }
 
 export type LogLevel = 'INFO' | 'CONNECT' | 'DATA' | 'WARN' | 'ERR' | 'SUCCESS';
@@ -46,9 +50,15 @@ export interface CrtConfig {
   curvature: boolean;
   curvatureIntensity: number; // 0 a 100%
   brightness: number; // 70 a 200%
+  vignetteIntensity: number; // 0 a 100%
+  cursorBlinkRate: number; // 0 = sem piscar (estático), 0.25 a 2.0s
   bezel: boolean;
   scanlines: boolean;
   jitter: boolean;
+  jitterIntensity: number; // 0 a 100%
+  hertz: boolean; // Efeito das faixas de varredura Hertz passando na tela
+  hertzSpeed: number; // Velocidade das faixas (1 a 100)
+  hertzWidth: number; // Largura / espessura das faixas (5 a 100)
 }
 
 export interface SystemMetrics {
@@ -78,13 +88,21 @@ export interface TerminalTab {
   sessionState: SessionState;
   remoteSessionName: string;
   shellType: string;
+  deviceType?: 'auto' | 'cisco' | 'mikrotik' | 'huawei' | 'juniper' | 'linux' | 'windows';
   currentPath: string;
   currentUsername: string;
   lines: TerminalLine[];
   inputValue: string;
   history: string[];
   historyIndex: number;
-  pendingSsh: { host: string; port: number; user: string } | null;
+  pendingSsh: {
+    host: string;
+    port: number;
+    user: string;
+    authType?: 'password' | 'key';
+    privateKey?: string;
+    passphrase?: string;
+  } | null;
   isPasswordInput: boolean;
   backendConnected: boolean;
   hasUnread?: boolean;

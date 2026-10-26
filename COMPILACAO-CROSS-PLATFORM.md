@@ -21,41 +21,44 @@ Você não precisa ter um computador Mac ou Linux para gerar os executáveis des
    * Abra o seu repositório no GitHub pelo navegador;
    * Clique na aba **"Actions"** (Ações);
    * Na barra lateral esquerda, clique em **"Build Cross-Platform Cyberdeck"**;
-   * Clique no botão cinza à direita: **"Run workflow"** ➔ Selecione o branch `main` e confirme.
+   * Clique no botão cinza à direita: **"Run workflow"** ➔ você pode informar a tag de versão desejada (ex: `v1.0.5`) e confirmar.
 
-3. **O GitHub compilará os 3 sistemas em paralelo**:
-   * 🪟 **Windows**: Cria o instalador `Cyberdeck CRT Terminal-Setup-1.0.0.exe` e a versão portátil `.exe`.
-   * 🐧 **Linux**: Cria o executável autônomo `Cyberdeck CRT Terminal-1.0.0.AppImage` e o instalador Debian/Ubuntu `.deb`.
-   * 🍎 **macOS**: Cria o instalador de disco `Cyberdeck CRT Terminal-1.0.0.dmg` e o `.zip`.
+3. **O GitHub compilará todos os sistemas em paralelo com a versão exata**:
+   * 🪟 **Windows**: `Cyberdeck-CRT-Terminal-<versao>-Setup.exe`, `Cyberdeck-CRT-Terminal-<versao>-Portable.exe` e `Cyberdeck-CRT-Terminal-<versao>-win-x64.zip`.
+   * 🐧 **Linux**: `Cyberdeck-CRT-Terminal-<versao>.AppImage`.
+   * 🍎 **macOS**: `Cyberdeck-CRT-Terminal-<versao>-x64.dmg` e `Cyberdeck-CRT-Terminal-<versao>-x64.zip`.
+   * 📱 **Android**: `Cyberdeck-CRT-Terminal-<versao>.apk`.
 
 4. **Como Baixar os Arquivos Prontos**:
-   * Assim que os 3 blocos ficarem verdes (sucesso), clique na execução concluída;
-   * Na seção **Artifacts** (Artefatos) no final da página, você verá os links de download direto para cada sistema operacional!
+   * Todos os binários são publicados automaticamente na aba **Releases** do repositório já com seus nomes contendo a versão exata da compilação!
+   * Também ficam disponíveis como download temporário na seção **Artifacts** da execução.
 
 ---
 
-## 🏷️ 2. Criar uma Release Oficial no GitHub (Opcional)
+## 🏷️ 2. Criar uma Release Oficial no GitHub por Tag
 
-Se você preferir que os executáveis fiquem publicados na aba pública de **Releases** do seu GitHub para qualquer pessoa baixar:
-
-Basta criar uma tag de versão no seu terminal local:
+Se preferir versionar por tag git no seu terminal:
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.0.5
+git push origin v1.0.5
 ```
-O GitHub Actions detectará a tag `v1.0.0`, fará a compilação completa e publicará automaticamente a **Release v1.0.0** com todos os binários anexados.
+O GitHub Actions detectará a tag `v1.0.5`, sincronizará a versão `1.0.5` em todos os executáveis, fará a compilação completa e publicará automaticamente a **Release v1.0.5** com todos os arquivos nomeados com `1.0.5`.
 
 ---
 
-## 💻 3. Como Compilar Localmente (No seu próprio PC)
+## 💻 3. Como Definir Versão e Compilar Localmente
 
-Se você quiser gerar o executável localmente:
+Para sincronizar a versão antes de compilar no seu PC:
+```bash
+npm run version:set 1.0.5
+```
+Isso atualiza simultaneamente o `package.json` e o `android/app/build.gradle`.
 
 ### No Windows:
 ```bash
 npm run package:win
 ```
-*O instalador e o executável portátil serão salvos na pasta `release/`.*
+*O instalador e o executável portátil serão salvos na pasta `release/` com o nome `Cyberdeck-CRT-Terminal-1.0.5-...`.*
 
 ### No Linux:
 ```bash

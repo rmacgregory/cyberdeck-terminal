@@ -25,6 +25,7 @@ import { QuickSessionsPanel } from './components/QuickSessionsPanel';
 import { ConnectionLogsPanel } from './components/ConnectionLogsPanel';
 import { QuickSessionModal } from './components/QuickSessionModal';
 import { IntegratedBrowser } from './components/IntegratedBrowser';
+import { getEquipmentCompletions } from './utils/equipmentCompletion';
 import { Terminal, Layers, Activity, Globe } from 'lucide-react';
 
 const WELCOME_BANNER = `
@@ -53,9 +54,15 @@ export default function App() {
       curvature: true,
       curvatureIntensity: 50,
       brightness: 115,
+      vignetteIntensity: 70,
+      cursorBlinkRate: 0.9,
       bezel: true,
       scanlines: true,
       jitter: false,
+      jitterIntensity: 30,
+      hertz: true,
+      hertzSpeed: 45,
+      hertzWidth: 40,
     };
   });
 
@@ -545,11 +552,81 @@ export default function App() {
     const scale = (1 - (curveIntensity / 100) * 0.032).toFixed(3);
     const radius = Math.round(4 + (curveIntensity / 100) * 36);
 
+    const vignetteVal = (crtConfig.vignetteIntensity ?? 70) / 100;
+
+    // Taxa de piscada do cursor: 0 = estático (solid / animation: none); > 0 = animado
+    if (crtConfig.cursorBlinkRate === 0) {
+      document.documentElement.style.setProperty('--term-cursor-animation', 'none');
+      document.documentElement.style.setProperty('--term-cursor-blink-rate', '0s');
+    } else {
+      const rate = crtConfig.cursorBlinkRate ?? 0.9;
+      document.documentElement.style.setProperty('--term-cursor-animation', `cursor-blink ${rate}s infinite`);
+      document.documentElement.style.setProperty('--term-cursor-blink-rate', `${rate}s`);
+    }
+
+    // Nível de Tremor / Jitter do canhão de elétrons CRT
+    const isJitterActive = crtConfig.jitter && (crtConfig.jitterIntensity ?? 0) > 0;
+    const jitterIntensity = isJitterActive ? (crtConfig.jitterIntensity ?? 30) : 0;
+    const jitterMaxPx = ((jitterIntensity / 100) * 3.5).toFixed(2);
+    const jitterDuration = Math.max(0.04, Number((0.15 - (jitterIntensity / 100) * 0.1).toFixed(3)));
+
+    if (jitterIntensity === 0) {
+      document.documentElement.style.setProperty('--crt-jitter-animation', 'none');
+      document.documentElement.style.setProperty('--crt-jitter-max', '0px');
+    } else {
+      document.documentElement.style.setProperty('--crt-jitter-max', `${jitterMaxPx}px`);
+      document.documentElement.style.setProperty(
+        '--crt-jitter-animation',
+        `crt-jitter ${jitterDuration}s infinite steps(2, jump-none)`
+      );
+    }
+
+    // Faixas de Hertz e Varredura Analógica (Roll Bars / 50Hz-60Hz)
+    const isHertzActive = crtConfig.hertz && (crtConfig.hertzSpeed ?? 0) > 0;
+    const hertzSpeed = isHertzActive ? (crtConfig.hertzSpeed ?? 45) : 0;
+    const hertzWidth = crtConfig.hertzWidth ?? 40;
+    const hertzDuration = Math.max(0.45, Number((15 * Math.pow(0.04, hertzSpeed / 100)).toFixed(2)));
+    const hertzHeightPx = Math.round(25 + (hertzWidth / 100) * 395);
+    const hertzSecondaryDelay = -(hertzDuration / 2).toFixed(2);
+
+    if (!isHertzActive) {
+      document.documentElement.style.setProperty('--crt-hertz-display', 'none');
+      document.documentElement.style.setProperty('--crt-hertz-animation-primary', 'none');
+      document.documentElement.style.setProperty('--crt-hertz-animation-secondary', 'none');
+    } else {
+      document.documentElement.style.setProperty('--crt-hertz-display', 'block');
+      document.documentElement.style.setProperty('--crt-hertz-height', `${hertzHeightPx}px`);
+      document.documentElement.style.setProperty(
+        '--crt-hertz-animation-primary',
+        `crt-hertz-roll ${hertzDuration}s linear infinite`
+      );
+      document.documentElement.style.setProperty(
+        '--crt-hertz-animation-secondary',
+        `crt-hertz-roll ${hertzDuration}s linear infinite`
+      );
+      document.documentElement.style.setProperty(
+        '--crt-hertz-delay-secondary',
+        `${hertzSecondaryDelay}s`
+      );
+    }
+
     document.documentElement.style.setProperty('--crt-brightness', String(brightnessVal));
     document.documentElement.style.setProperty('--crt-perspective', `${perspective}px`);
     document.documentElement.style.setProperty('--crt-scale', String(scale));
     document.documentElement.style.setProperty('--crt-radius', `${radius}px`);
-  }, [crtConfig.brightness, crtConfig.curvature, crtConfig.curvatureIntensity]);
+    document.documentElement.style.setProperty('--crt-vignette-opacity', String(vignetteVal));
+  }, [
+    crtConfig.brightness,
+    crtConfig.curvature,
+    crtConfig.curvatureIntensity,
+    crtConfig.vignetteIntensity,
+    crtConfig.cursorBlinkRate,
+    crtConfig.jitter,
+    crtConfig.jitterIntensity,
+    crtConfig.hertz,
+    crtConfig.hertzSpeed,
+    crtConfig.hertzWidth,
+  ]);
 
   // Update theme on body
   const handleThemeChange = (newTheme: TerminalTheme) => {
@@ -635,6 +712,19 @@ export default function App() {
     const socket = tabSocketsRef.current.get(tabId);
     if (session.protocol === 'TELNET') {
       appendLineToTab(tabId, `[TELNET] Conectando a ${session.ip}:${session.port || 23}...`, 'info');
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === tabId
+            ? {
+                ...t,
+                protocol: 'TELNET',
+                target: session.ip,
+                deviceType: session.deviceType || 'auto',
+                title: `TELNET: ${session.name || session.ip}`,
+              }
+            : t
+        )
+      );
       addLog('CONNECT', 'TELNET', `Abrindo socket TCP raw -> ${session.ip}:${session.port || 23}`, session.ip);
       if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(
@@ -655,21 +745,59 @@ export default function App() {
         `[SSH] Acesso rápido selecionado: ${session.name} (${user}@${session.ip}:${port})`,
         'info'
       );
-      appendLineToTab(tabId, `Digite a senha para ${user}@${session.ip}:`, 'stdout');
-      setTabs((prev) =>
-        prev.map((t) =>
-          t.id === tabId
-            ? {
-                ...t,
-                pendingSsh: { host: session.ip, port, user },
-                isPasswordInput: true,
-                protocol: 'SSH',
-                target: session.ip,
-                title: `SSH: ${session.name || session.ip}`,
-              }
-            : t
-        )
-      );
+
+      // Autenticação direta com Chave Privada (PEM / OpenSSH)
+      if (session.authType === 'key' && session.privateKey) {
+        appendLineToTab(tabId, `[SSH] Autenticando com Chave Privada (PEM/OpenSSH)...`, 'dim');
+        addLog('CONNECT', 'SSH', `Autenticando via Chave Privada em ${user}@${session.ip}:${port}`);
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === tabId
+              ? {
+                  ...t,
+                  pendingSsh: null,
+                  isPasswordInput: false,
+                  protocol: 'SSH',
+                  target: session.ip,
+                  deviceType: session.deviceType || 'auto',
+                  title: `SSH: ${session.name || session.ip}`,
+                }
+              : t
+          )
+        );
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(
+            JSON.stringify({
+              type: 'ssh',
+              host: session.ip,
+              port,
+              user,
+              privateKey: session.privateKey,
+              passphrase: session.passphrase || '',
+            })
+          );
+        } else {
+          appendLineToTab(tabId, `[AVISO] Backend Node.js offline. Inicie o backend na porta 3001.`, 'warning');
+        }
+      } else {
+        // Autenticação tradicional por Senha
+        appendLineToTab(tabId, `Digite a senha para ${user}@${session.ip}:`, 'stdout');
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === tabId
+              ? {
+                  ...t,
+                  pendingSsh: { host: session.ip, port, user },
+                  isPasswordInput: true,
+                  protocol: 'SSH',
+                  target: session.ip,
+                  deviceType: session.deviceType || 'auto',
+                  title: `SSH: ${session.name || session.ip}`,
+                }
+              : t
+          )
+        );
+      }
     } else if (session.protocol === 'PING') {
       appendLineToTab(tabId, `Disparando ${session.ip} com 32 bytes de dados:`, 'info');
       if (socket && socket.readyState === WebSocket.OPEN) {
@@ -1031,6 +1159,202 @@ export default function App() {
       return;
     }
 
+    if (cmd === 'vignette' || cmd === 'vinheta') {
+      const sub = args[0]?.toLowerCase();
+      if (sub === 'off' || sub === 'desligar' || sub === '0') {
+        updateCrtConfig({ vignetteIntensity: 0 });
+        appendLine('[*] Vinheta CRT DESLIGADA', 'info');
+        return;
+      }
+      const val = parseInt(args[0], 10);
+      if (!isNaN(val) && val >= 0 && val <= 100) {
+        updateCrtConfig({ vignetteIntensity: val });
+        appendLine(`[*] Intensidade da vinheta CRT ajustada para: ${val}%`, 'success');
+      } else {
+        appendLine(`[*] Vinheta atual: ${crtConfig.vignetteIntensity ?? 70}%`, 'info');
+        appendLine('Uso: vinheta <0 - 100> (ex: vinheta 80 | vinheta off)', 'dim');
+      }
+      return;
+    }
+
+    if (cmd === 'cursor' || cmd === 'blink') {
+      const sub = args[0]?.toLowerCase();
+      if (!sub) {
+        appendLine(
+          `[*] Taxa de piscada do cursor: ${
+            crtConfig.cursorBlinkRate === 0
+              ? 'ESTÁTICO (OFF)'
+              : `${(crtConfig.cursorBlinkRate ?? 0.9).toFixed(2)}s`
+          }`,
+          'info'
+        );
+        appendLine('Uso: cursor <segundos|solid|off|slow|fast|turbo> (ex: cursor 0.5s ou cursor solid)', 'dim');
+        return;
+      }
+
+      if (sub === 'off' || sub === 'solid' || sub === 'estatico' || sub === '0') {
+        updateCrtConfig({ cursorBlinkRate: 0 });
+        appendLine('[*] Cursor do terminal configurado para: ESTÁTICO (Sem piscar)', 'success');
+      } else if (sub === 'turbo') {
+        updateCrtConfig({ cursorBlinkRate: 0.25 });
+        appendLine('[*] Cursor do terminal: TURBO (0.25s)', 'success');
+      } else if (sub === 'fast' || sub === 'rapido') {
+        updateCrtConfig({ cursorBlinkRate: 0.5 });
+        appendLine('[*] Cursor do terminal: RÁPIDO (0.50s)', 'success');
+      } else if (sub === 'normal' || sub === 'padrao') {
+        updateCrtConfig({ cursorBlinkRate: 0.9 });
+        appendLine('[*] Cursor do terminal: PADRÃO (0.90s)', 'success');
+      } else if (sub === 'slow' || sub === 'lento') {
+        updateCrtConfig({ cursorBlinkRate: 1.4 });
+        appendLine('[*] Cursor do terminal: LENTO (1.40s)', 'success');
+      } else {
+        const num = parseFloat(sub.replace('s', ''));
+        if (isNaN(num) || num < 0) {
+          appendLine('Valor inválido. Use um número de 0 (estático) a 2 segundos (ex: cursor 0.4s)', 'error');
+          return;
+        }
+        const clamped = Math.max(0, Math.min(2.0, num));
+        updateCrtConfig({ cursorBlinkRate: clamped });
+        appendLine(
+          `[*] Taxa de piscada do cursor ajustada para: ${
+            clamped === 0 ? 'ESTÁTICO' : `${clamped.toFixed(2)}s`
+          }`,
+          'success'
+        );
+      }
+      return;
+    }
+
+    if (cmd === 'jitter' || cmd === 'tremor') {
+      const sub = args[0]?.toLowerCase();
+      if (!sub) {
+        const isAct = crtConfig.jitter && (crtConfig.jitterIntensity ?? 30) > 0;
+        appendLine(
+          `[*] Nível de tremor CRT (Jitter): ${
+            isAct ? `${crtConfig.jitterIntensity ?? 30}% (LIGADO)` : 'DESLIGADO'
+          }`,
+          'info'
+        );
+        appendLine('Uso: jitter <0-100|off|on> (ex: jitter 35 ou jitter off)', 'dim');
+        return;
+      }
+
+      if (sub === 'off' || sub === 'desligar' || sub === '0') {
+        updateCrtConfig({ jitter: false, jitterIntensity: 0 });
+        appendLine('[*] Tremor da imagem CRT (Jitter) DESLIGADO', 'info');
+      } else if (sub === 'on' || sub === 'ligar') {
+        updateCrtConfig({ jitter: true, jitterIntensity: crtConfig.jitterIntensity || 35 });
+        appendLine(`[*] Tremor da imagem CRT (Jitter) LIGADO (${crtConfig.jitterIntensity || 35}%)`, 'success');
+      } else {
+        const val = parseInt(sub.replace('%', ''), 10);
+        if (isNaN(val) || val < 0 || val > 100) {
+          appendLine('Valor inválido. Use um número de 0 (desligado) a 100% (ex: jitter 35)', 'error');
+          return;
+        }
+        updateCrtConfig({ jitter: val > 0, jitterIntensity: val });
+        appendLine(
+          `[*] Tremor da imagem CRT (Jitter) ajustado para: ${val === 0 ? 'DESLIGADO' : `${val}%`}`,
+          'success'
+        );
+      }
+      return;
+    }
+
+    if (cmd === 'hertz' || cmd === 'hz' || cmd === 'roll' || cmd === 'faixas') {
+      const sub = args[0]?.toLowerCase();
+      if (!sub) {
+        appendLine(
+          `[*] Faixas de Hertz CRT: ${crtConfig.hertz ? 'LIGADO' : 'DESLIGADO'} (Velocidade: ${crtConfig.hertzSpeed ?? 45}%, Largura: ${crtConfig.hertzWidth ?? 40}%)`,
+          'info'
+        );
+        appendLine('Uso: hertz <on|off> | hertz <velocidade 1-100> [largura 5-100]', 'dim');
+        appendLine('     hertz speed <1-100> | hertz width <5-100>', 'dim');
+        appendLine('Presets: hertz 50hz | hertz 60hz | hertz drift | hertz ac | hertz desync', 'dim');
+        return;
+      }
+
+      if (sub === 'off' || sub === 'desligar' || sub === '0') {
+        updateCrtConfig({ hertz: false });
+        appendLine('[*] Faixas de Hertz CRT DESLIGADAS', 'info');
+        return;
+      }
+
+      if (sub === 'on' || sub === 'ligar') {
+        updateCrtConfig({
+          hertz: true,
+          hertzSpeed: crtConfig.hertzSpeed || 45,
+          hertzWidth: crtConfig.hertzWidth || 40,
+        });
+        appendLine(
+          `[*] Faixas de Hertz CRT LIGADAS (Velocidade: ${crtConfig.hertzSpeed || 45}%, Largura: ${crtConfig.hertzWidth || 40}%)`,
+          'success'
+        );
+        return;
+      }
+
+      if (sub === '50hz' || sub === 'drift') {
+        updateCrtConfig({ hertz: true, hertzSpeed: 25, hertzWidth: 30 });
+        appendLine('[*] Preset Hertz 50Hz Drift ativado (Velocidade: 25%, Largura: 30%)', 'success');
+        return;
+      }
+
+      if (sub === '60hz' || sub === 'crt' || sub === 'padrao') {
+        updateCrtConfig({ hertz: true, hertzSpeed: 45, hertzWidth: 40 });
+        appendLine('[*] Preset Hertz 60Hz Clássico ativado (Velocidade: 45%, Largura: 40%)', 'success');
+        return;
+      }
+
+      if (sub === 'ac' || sub === 'hum') {
+        updateCrtConfig({ hertz: true, hertzSpeed: 75, hertzWidth: 65 });
+        appendLine('[*] Preset Interferência AC ativado (Velocidade: 75%, Largura: 65%)', 'success');
+        return;
+      }
+
+      if (sub === 'caos' || sub === 'desync') {
+        updateCrtConfig({ hertz: true, hertzSpeed: 95, hertzWidth: 90 });
+        appendLine('[*] Preset Desync Total ativado (Velocidade: 95%, Largura: 90%)', 'success');
+        return;
+      }
+
+      if (sub === 'speed' || sub === 'vel' || sub === 'velocidade') {
+        const val = parseInt(args[1], 10);
+        if (isNaN(val) || val < 1 || val > 100) {
+          appendLine('Velocidade inválida. Use um número de 1 a 100 (ex: hertz speed 60)', 'error');
+          return;
+        }
+        updateCrtConfig({ hertz: true, hertzSpeed: val });
+        appendLine(`[*] Velocidade das faixas de Hertz ajustada para: ${val}%`, 'success');
+        return;
+      }
+
+      if (sub === 'width' || sub === 'largura' || sub === 'espessura') {
+        const val = parseInt(args[1], 10);
+        if (isNaN(val) || val < 5 || val > 100) {
+          appendLine('Largura inválida. Use um número de 5 a 100 (ex: hertz width 50)', 'error');
+          return;
+        }
+        updateCrtConfig({ hertz: true, hertzWidth: val });
+        appendLine(`[*] Largura das faixas de Hertz ajustada para: ${val}%`, 'success');
+        return;
+      }
+
+      // Sintaxe direta: hertz <vel> [largura]
+      const speedVal = parseInt(sub.replace('%', ''), 10);
+      if (!isNaN(speedVal) && speedVal >= 1 && speedVal <= 100) {
+        const widthVal = args[1] ? parseInt(args[1].replace('%', ''), 10) : crtConfig.hertzWidth || 40;
+        const validWidth = !isNaN(widthVal) && widthVal >= 5 && widthVal <= 100 ? widthVal : (crtConfig.hertzWidth || 40);
+        updateCrtConfig({ hertz: true, hertzSpeed: speedVal, hertzWidth: validWidth });
+        appendLine(
+          `[*] Faixas de Hertz CRT ajustadas: Velocidade ${speedVal}%, Largura ${validWidth}%`,
+          'success'
+        );
+        return;
+      }
+
+      appendLine('Comando não reconhecido. Digite "hertz" para instruções.', 'warning');
+      return;
+    }
+
     if (cmd === 'history') {
       currentTab.history.forEach((h, i) => appendLine(`${i + 1}  ${h}`, 'dim'));
       return;
@@ -1093,31 +1417,65 @@ export default function App() {
 
   const handleSshDispatch = (args: string[]) => {
     if (args.length === 0) {
-      appendLine('Uso: ssh <host> [-l usuario] [-p porta] ou ssh usuario@host', 'warning');
+      appendLine('Uso: ssh [-i chave.pem] [-p porta] [-l usuario] [usuario@]host', 'warning');
       return;
     }
 
     let user = 'admin';
     let host = '';
     let port = 22;
+    let keyPath: string | null = null;
 
-    const rawTarget = args[0];
-    if (rawTarget.includes('@')) {
-      const [u, h] = rawTarget.split('@');
-      user = u;
-      host = h;
-    } else {
-      host = rawTarget;
-    }
-
-    for (let i = 1; i < args.length; i++) {
+    for (let i = 0; i < args.length; i++) {
       if (args[i] === '-l' && args[i + 1]) {
         user = args[i + 1];
         i++;
       } else if (args[i] === '-p' && args[i + 1]) {
         port = parseInt(args[i + 1], 10) || 22;
         i++;
+      } else if ((args[i] === '-i' || args[i] === '--key') && args[i + 1]) {
+        keyPath = args[i + 1];
+        i++;
+      } else if (!host && !args[i].startsWith('-')) {
+        if (args[i].includes('@')) {
+          const [u, h] = args[i].split('@');
+          user = u;
+          host = h;
+        } else {
+          host = args[i];
+        }
       }
+    }
+
+    if (!host) {
+      appendLine('Uso: ssh [-i chave.pem] [-p porta] [-l usuario] [usuario@]host', 'warning');
+      return;
+    }
+
+    const socket = tabSocketsRef.current.get(currentTab.id);
+
+    // Se -i foi passado e backend está conectado, envia para o backend ler e autenticar pela chave
+    if (keyPath && currentTab.backendConnected && socket && socket.readyState === WebSocket.OPEN) {
+      appendLine(`[SSH] Conectando a ${user}@${host}:${port} com chave: ${keyPath}...`, 'info');
+      socket.send(
+        JSON.stringify({
+          type: 'stdin',
+          command: `ssh -i "${keyPath}" -p ${port} -l ${user} ${host}`,
+        })
+      );
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === currentTab.id
+            ? {
+                ...t,
+                protocol: 'SSH',
+                target: host,
+                title: `SSH: ${user}@${host}`,
+              }
+            : t
+        )
+      );
+      return;
     }
 
     appendLine(`Conectando via SSH seguro a ${user}@${host}:${port}...`, 'info');
@@ -1310,9 +1668,10 @@ export default function App() {
     appendLine(`• Atalhos de Teclado       : Alt+T (Nova Aba) | Alt+W (Fechar) | Alt+1..9 (Trocar).`, 'success');
     appendLine(``, 'stdout');
     appendLine(`COMANDOS DE REDE & DISPOSITIVOS:`, 'warning');
-    appendLine(`• ssh <user@host> [-p porta]: Inicia sessão SSH interativa no roteador/servidor.`, 'stdout');
-    appendLine(`• telnet <host> [porta]    : Conexão direta TCP Socket Telnet para switches/roteadores.`, 'stdout');
+    appendLine(`• ssh [-i chave.pem] [user@]host [-p porta] : Sessão SSH segura com senha ou chave PEM/pub.`, 'stdout');
+    appendLine(`• telnet <host> [porta]    : Conexão direta TCP Socket Telnet (RFC 854) para switches/roteadores.`, 'stdout');
     appendLine(`• ping <host>              : Dispara teste de conectividade ICMP e latência.`, 'stdout');
+    appendLine(`• Tecla [TAB]              : Autocompleta comandos conforme o equipamento (Cisco, MikroTik, etc).`, 'success');
     appendLine(``, 'stdout');
     appendLine(`INTERPRETADORES DE SHELL:`, 'warning');
     appendLine(`• powershell / pwsh        : Alterna para o Windows PowerShell.`, 'stdout');
@@ -1320,11 +1679,17 @@ export default function App() {
     appendLine(`• bash / zsh / sh          : Alterna para interpretador Unix/Linux/macOS.`, 'stdout');
     appendLine(``, 'stdout');
     appendLine(`VISUAL & SISTEMA:`, 'warning');
+    appendLine(`• cursor [solid|0.5s|slow] : Controla a taxa de piscada (blink rate) do cursor.`, 'stdout');
+    appendLine(`• brightness <70-200>      : Ajusta o brilho da tela de fósforo CRT.`, 'stdout');
+    appendLine(`• curve <0-100|off>        : Configura a curvatura esférica do tubo CRT.`, 'stdout');
+    appendLine(`• vinheta <0-100|off>      : Ajusta a intensidade do escurecimento de bordas.`, 'stdout');
+    appendLine(`• jitter <0-100|off>       : Controla o nível de tremor/instabilidade da imagem CRT.`, 'stdout');
+    appendLine(`• hertz <vel> [largura]    : Controla as faixas de varredura Hertz (50Hz/60Hz roll bar).`, 'stdout');
     appendLine(`• theme [green|amber|cyan] : Altera paleta de fósforo da tela CRT.`, 'stdout');
     appendLine(`• crt [real|leve|bloom|off]: Modos do tubo catódico, curvatura e moldura bezel.`, 'stdout');
     appendLine(`• font [family|size|space] : Tipografia CRT: 4 fontes, 3 tamanhos e espaçamentos.`, 'stdout');
     appendLine(`• browser / web <url>      : Abre navegador web integrado com efeito CRT (Alpha).`, 'stdout');
-    appendLine(`• systeminfo               : Exibe arquitetura 64-bit, SO e detalhes de conexão.`, 'stdout');
+    appendLine(`• systeminfo               : Exibe arquitetura 64-bit, SO e telemetria de CPU/RAM.`, 'stdout');
     appendLine(`• clear / cls              : Limpa a tela da aba atual.`, 'stdout');
     appendLine(`--------------------------------------------------------------------------------`, 'dim');
     appendLine(`Cadastre seus equipamentos no painel lateral [SESSÕES RÁPIDAS]!`, 'success');
@@ -1394,45 +1759,23 @@ export default function App() {
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      const current = currentTab.inputValue.trim();
-      const baseCommands = [
-        'tab',
-        'tabs',
-        'powershell',
-        'pwsh',
-        'cmd',
-        'bash',
-        'zsh',
-        'sh',
-        'dir',
-        'ls',
-        'cd',
-        'ipconfig',
-        'ifconfig',
-        'ping',
-        'ssh',
-        'telnet',
-        'backend',
-        'reconnect',
-        'theme',
-        'crt',
-        'font',
-        'fonte',
-        'browser',
-        'web',
-        'cls',
-        'clear',
-        'whoami',
-        'systeminfo',
-        'exit',
-        'help',
-      ];
-      const match = baseCommands.find((c) => c.startsWith(current));
-      if (match) {
+      const rawInput = currentTab.inputValue;
+      const result = getEquipmentCompletions(rawInput, currentTab);
+
+      if (result.completedText) {
         setTabs((prev) =>
           prev.map((t) =>
-            t.id === currentTab.id ? { ...t, inputValue: match + ' ' } : t
+            t.id === currentTab.id ? { ...t, inputValue: result.completedText! } : t
           )
+        );
+      }
+
+      if (result.suggestions.length > 0 && (!result.completedText || result.suggestions.length > 1)) {
+        appendLine(
+          `[TAB ${result.equipmentLabel}] ${result.suggestions.slice(0, 8).join('  •  ')}${
+            result.suggestions.length > 8 ? ' ...' : ''
+          }`,
+          'dim'
         );
       }
     } else if (e.key === 'c' && e.ctrlKey) {
@@ -1652,6 +1995,12 @@ export default function App() {
         <div className="crt-glass-glare" />
         <div className="crt-vignette-layer" />
         <div className="crt-refresh-bar" />
+        {crtConfig.hertz && (
+          <div className="crt-hertz-container" aria-hidden="true">
+            <div className="crt-hertz-band-primary" />
+            <div className="crt-hertz-band-secondary" />
+          </div>
+        )}
 
         {appContent}
       </div>
@@ -1681,6 +2030,12 @@ export default function App() {
     return (
       <div className="w-full h-screen flex flex-col p-2 sm:p-4 crt-monitor crt-brightness-layer overflow-hidden select-text relative">
         <div className="crt-overlay"></div>
+        {crtConfig.hertz && (
+          <div className="crt-hertz-container" aria-hidden="true">
+            <div className="crt-hertz-band-primary" />
+            <div className="crt-hertz-band-secondary" />
+          </div>
+        )}
         {appContent}
       </div>
     );

@@ -21,6 +21,7 @@
     "cap:build": "vite build && cap sync android",
     "cap:open": "cap open android",
     "build:android": "vite build && cap sync android && cd android && ./gradlew assembleDebug",
+    "version:set": "node scripts/set-version.js",
     "clean": "rm -rf dist server.js release",
     "lint": "tsc --noEmit"
   },
@@ -98,7 +99,8 @@
           ]
         }
       ],
-      "signExecutable": false
+      "signExecutable": false,
+      "artifactName": "Cyberdeck-CRT-Terminal-${version}-win-x64.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -106,10 +108,10 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Cyberdeck CRT Terminal",
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "Cyberdeck-CRT-Terminal-${version}-Setup.${ext}"
     },
     "portable": {
-      "artifactName": "${productName}-Portable-${version}.${ext}"
+      "artifactName": "Cyberdeck-CRT-Terminal-${version}-Portable.${ext}"
     },
     "linux": {
       "target": [
@@ -117,7 +119,7 @@
       ],
       "maintainer": "Cyberdeck <dev@cyberdeck.local>",
       "category": "Utility",
-      "artifactName": "${productName}-${version}.${ext}"
+      "artifactName": "Cyberdeck-CRT-Terminal-${version}.${ext}"
     },
     "mac": {
       "target": [
@@ -125,7 +127,7 @@
         "zip"
       ],
       "category": "public.app-category.developer-tools",
-      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "artifactName": "Cyberdeck-CRT-Terminal-${version}-${arch}.${ext}",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "identity": null,

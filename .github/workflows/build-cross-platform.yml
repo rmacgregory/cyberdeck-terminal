@@ -22,8 +22,43 @@ permissions:
   contents: write
 
 jobs:
+  prepare:
+    name: Determinar Versão da Compilação
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      tag: ${{ steps.get_version.outputs.tag }}
+      build_number: ${{ steps.get_version.outputs.build_number }}
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Calcular Versão Exata
+        id: get_version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            RAW_TAG="${{ github.event.inputs.tag_name }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            RAW_TAG="${{ github.ref_name }}"
+          else
+            # Versão base do package.json combinada com o número de execução
+            BASE_VER=$(node -p "require('./package.json').version")
+            RAW_TAG="v${BASE_VER}.${{ github.run_number }}"
+          fi
+
+          # Versão limpa (sem 'v') para package.json e nomes de binários
+          CLEAN_VER="${RAW_TAG#v}"
+          FINAL_TAG="v${CLEAN_VER}"
+
+          echo "version=${CLEAN_VER}" >> $GITHUB_OUTPUT
+          echo "tag=${FINAL_TAG}" >> $GITHUB_OUTPUT
+          echo "build_number=${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "=== Versão calculada: ${CLEAN_VER} | Tag: ${FINAL_TAG} | Build #${{ github.run_number }} ==="
+
   build:
     name: Build para ${{ matrix.os-name }}
+    needs: prepare
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -47,6 +82,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Sincronizar Versão nos Arquivos do Projeto
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '${{ needs.prepare.outputs.version }}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+            console.log('Versão atualizada no package.json para: ' + pkg.version);
+          "
 
       - name: Instalar Dependências
         shell: bash
@@ -75,7 +121,6 @@ jobs:
 
       - name: Compilar Aplicativo Desktop (${{ matrix.os-name }})
         env:
-          # Desativa a busca obrigatória por certificados pagos (Apple/Microsoft) para compilar sem erros de assinatura
           CSC_IDENTITY_AUTO_DISCOVERY: false
           DEBUG: electron-builder
         run: npx electron-builder ${{ matrix.builder-args }} --publish never
@@ -93,6 +138,7 @@ jobs:
 
   android:
     name: Build para Android (.apk)
+    needs: prepare
     runs-on: ubuntu-latest
     steps:
       - name: Checkout do Repositório
@@ -109,6 +155,17 @@ jobs:
         with:
           node-version: 22
 
+      - name: Sincronizar Versão nos Arquivos do Projeto
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '${{ needs.prepare.outputs.version }}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+            console.log('Versão atualizada no package.json para: ' + pkg.version);
+          "
+
       - name: Instalar Dependências
         shell: bash
         run: |
@@ -124,15 +181,18 @@ jobs:
       - name: Permissão de execução para o Gradle
         run: chmod +x android/gradlew
 
-      - name: Compilar APK Debug
+      - name: Compilar APK Debug com Versão Exata
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug -PversionName=${{ needs.prepare.outputs.version }} -PversionCode=${{ needs.prepare.outputs.build_number }} --no-daemon
 
-      - name: Organizar APK para Artefatos
+      - name: Organizar APK para Artefatos com Nome da Versão
+        shell: bash
         run: |
           mkdir -p release-android
-          cp android/app/build/outputs/apk/debug/app-debug.apk release-android/Cyberdeck-Terminal-Android-debug.apk
+          find android/app/build/outputs/apk/debug/ -type f -name "*.apk" -exec cp {} release-android/Cyberdeck-CRT-Terminal-${{ needs.prepare.outputs.version }}.apk \;
+          echo "=== APK gerado com a versão ==="
+          ls -lh release-android/
 
       - name: Salvar Artefatos Compilados (Android APK)
         uses: actions/upload-artifact@v4
@@ -143,7 +203,7 @@ jobs:
 
   release:
     name: Publicar Release no GitHub
-    needs: [build, android]
+    needs: [prepare, build, android]
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -151,38 +211,24 @@ jobs:
       - name: Checkout do Repositório
         uses: actions/checkout@v4
 
-      - name: Determinar Tag do Release
-        id: release_info
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag_name }}" ]; then
-            TAG="${{ github.event.inputs.tag_name }}"
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TAG="${{ github.ref_name }}"
-          else
-            TAG="v1.0.${{ github.run_number }}"
-          fi
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "Tag definida: $TAG"
-
       - name: Baixar todos os artefatos compilados
         uses: actions/download-artifact@v4
         with:
           path: all-releases
 
-      - name: Organizar e listar binários prontos
+      - name: Organizar e listar binários prontos com a versão correta
         shell: bash
         run: |
           mkdir -p dist-releases
           find all-releases -type f \( -name "*.exe" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.zip" -o -name "*.apk" \) -exec cp {} dist-releases/ \;
-          echo "=== Arquivos prontos para o Release ==="
+          echo "=== Arquivos prontos para o Release ${{ needs.prepare.outputs.tag }} ==="
           ls -lh dist-releases/
 
       - name: Publicar Release no GitHub com Binários
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.release_info.outputs.tag }}
-          name: Cyberdeck Terminal ${{ steps.release_info.outputs.tag }}
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: Cyberdeck CRT Terminal ${{ needs.prepare.outputs.tag }}
           files: dist-releases/*
           draft: false
           prerelease: false
@@ -192,4 +238,3 @@ jobs:
           target_commitish: ${{ github.sha }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

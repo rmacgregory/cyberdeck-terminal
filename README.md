@@ -26,9 +26,17 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
 * **Notificação de Fundo**: Indicadores visuais na barra de abas avisam quando uma sessão em segundo plano recebe novas saídas de dados.
 * **Gerenciamento Fácil**: Abra abas pelo botão `+ Nova Aba`, atalhos de teclado ou diretamente pelos comandos `tab new`, `tab close` e painel de Acessos Rápidos.
 
-### 🖥️ 2. Simulação CRT Avançada, Brilho & Curvatura Ajustável
+### 🖥️ 2. Simulação CRT Avançada, Brilho, Curvatura, Jitter & Faixas de Hertz
+* **Efeito das Faixas de Hertz (Varredura Analógica / Roll Bars)**: Simulação ultra realista de interferência de frequência de rede (50Hz/60Hz AC hum e desincronização da taxa de varredura vertical) com passagem contínua de faixas luminosas e escuras pela tela. Totalmente configurável via HUD ou comandos de terminal:
+  * **Velocidade de Passagem**: De 1% (varredura ultra lenta de 15s) a 100% (flutter rápido de 0.5s).
+  * **Largura das Faixas**: De 5% (linhas de feixe finas de 30px) a 100% (macrofaixas de interferência de 420px).
+  * **Presets Rápidos**: *50Hz Drift*, *60Hz Clássico*, *Interferência AC* e *Desync Total*.
+  * Comandos de Terminal: `hertz <velocidade> [largura]`, `hertz speed <1-100>`, `hertz width <5-100>`, `hertz 60hz`, `hertz off/on`.
+* **Tremor da Imagem (Jitter do Tubo CRT)**: Animação CSS de instabilidade aleatória do canhão de elétrons ajustável de 0% (imagem estável) a 100% (caos vintage), configurável pelo HUD ou comando `jitter <0-100|off>`.
 * **Controle Dinâmico de Brilho**: Ajuste fino da luminosidade do monitor CRT de 70% a 200% via slider na interface ou comando `brightness <valor>`.
 * **Curvatura do Tubo Regulável**: Intensidade da distorção esférica ajustável de 0% (plano total) até 100% (tubo esférico vintage acentuado) via slider ou comando `curve <0-100>`.
+* **Intensidade da Vinheta**: Controle óptico do escurecimento das bordas (0% desligado até 100% escuro) com presets rápidos no HUD e comando `vinheta <0-100|off>`.
+* **Taxa de Piscada do Cursor (Blink Rate)**: Controle no HUD com preview ao vivo, suportando modo fixo/estático (`solid`), lento, normal ou turbo (comando `cursor <solid|0.5s|turbo>`).
 * **Configurações Unificadas de Tela & Tipografia**: Fontes, tamanhos e espaçamento agora acessíveis diretamente dentro do menu de configurações CRT.
 * **Brilho de Fósforo & Bloom Intenso**: Efeito de irradiação de luz nos caracteres (`Extreme`, `Normal`, `Soft`).
 * **Linhas de Varredura (Scanlines & Aperture Grille)**: Efeito clássico de tubo de raios catódicos com subpixels RGB analógicos.
@@ -59,11 +67,12 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
 * Comunicação bidirecional contínua de baixa latência via **WebSockets (porta 3001)**.
 * No modo Desktop (Electron), o servidor backend é iniciado automaticamente em segundo plano.
 
-### 📡 6. Protocolos de Rede & Acesso Remoto
-* **SSH Integrado**: Conecte-se diretamente a roteadores, switches e servidores Linux (`ssh usuario@host -p 22`).
+### 📡 6. Protocolos de Rede, Chaves SSH & Autocompletação Inteligente
+* **SSH Integrado com Chaves Privadas (PEM / OpenSSH / RSA / Ed25519)**: Conexão direta por senha ou arquivo de chave (`ssh -i chave.pem usuario@host -p 22`) e leitor de arquivos no modal de conexões rápidas.
+* **Autocompletação por Equipamento (`[TAB]`)**: O terminal detecta se você está conectado a roteadores e switches (Cisco IOS, MikroTik RouterOS, Huawei VRP, Juniper JunOS) ou servidores (Linux/Windows) e autocompleta os comandos nativos do dispositivo.
 * **Telnet & Raw TCP Socket**: Conexões diretas de socket com dispositivos legados, BBS e consoles de infraestrutura (`telnet host porta`).
 * **Ping / ICMP Real**: Testes de alcance de pacotes e latência em milissegundos.
-* **Painel de Acessos Rápidos (Quick Sessions)**: Salve conexões frequentes com IP, porta, protocolo e credenciais salvas localmente. Opção de conectar direto na aba atual ou abrir automaticamente em uma nova aba!
+* **Painel de Acessos Rápidos (Quick Sessions)**: Salve conexões frequentes com IP, porta, protocolo, tipo de equipamento e credenciais (senha ou chave privada). Opção de conectar direto na aba atual ou abrir automaticamente em uma nova aba!
 * **Auditoria de Logs em Tempo Real**: Telemetria detalhada de eventos de rede, pacotes TX/RX, conexões e comandos com filtros por nível (`INFO`, `WARN`, `ERROR`, `DATA`, `SUCCESS`).
 
 ---
@@ -119,23 +128,29 @@ npm run electron:start
 
 Digite os comandos abaixo diretamente no prompt do Cyberdeck:
 
-| Comando | Descrição |
+| Comando / Atalho | Descrição |
 | :--- | :--- |
 | `help` | Exibe a lista completa de comandos e sintaxe de uso |
+| `[TAB]` | Autocompleta comandos de acordo com o equipamento conectado (Cisco, MikroTik, Linux, etc.) |
 | `systeminfo` | Exibe dados do sistema operacional, host e arquitetura (x64) |
 | `tab new [nome]` | Abre uma nova aba de terminal para conectar em outro equipamento |
 | `tab close` | Fecha a aba ativa atual |
 | `tab rename <nome>` | Renomeia o título da aba atual |
 | `theme <green\|amber\|cyan\|magenta>` | Altera a cor do fósforo da tela CRT |
 | `crt <real\|subtle\|off\|bloom\|bezel\|curve>` | Controla os efeitos de tubo, curvatura, bloom e moldura |
+| `brightness <70-200>` | Ajusta a intensidade luminosa de fósforo da tela |
+| `curve <0-100\|off>` | Ajusta o raio de curvatura esférica do tubo CRT |
+| `vinheta <0-100\|off>` | Ajusta a vinheta óptica analógica de escurecimento periférico |
+| `jitter <0-100\|off>` | Ajusta a intensidade do tremor/instabilidade analógica do tubo CRT |
+| `hertz <vel> [largura]` | Controla faixas de varredura Hertz (velocidade 1-100, largura 5-100, off/on) |
+| `cursor <solid\|0.5s\|slow\|fast>` | Ajusta a taxa de piscada (blink rate) do cursor do terminal |
 | `font <família\|sm\|md\|lg\|normal\|compacto>` | Ajusta a tipografia e o espaçamento de linhas |
 | `browser <url>` | Abre o navegador web Cyber-Net na URL informada *(Alpha)* |
 | `youtube <link_ou_id>` | Abre o player do YouTube dentro da estética CRT |
 | `powershell` / `cmd` / `bash` / `zsh` | Alterna o interpretador de comandos ativo |
-| `ssh <usuario@host>` | Inicia uma sessão SSH com terminal interativo |
+| `ssh [-i chave.pem] <usuario@host>` | Conecta via SSH com suporte a senha ou chave privada (PEM/OpenSSH) |
 | `telnet <host> <porta>` | Abre um socket TCP Telnet/Raw |
 | `ping <host>` | Dispara testes de latência ICMP |
-| `download` | Baixa o arquivo portátil offline (`cyberdeckterminalv2.html`) |
 | `clear` ou `cls` | Limpa a tela da aba atual |
 
 ---
@@ -144,10 +159,11 @@ Digite os comandos abaixo diretamente no prompt do Cyberdeck:
 
 * **Criação & Inteligência**: Desenvolvido integralmente em **vibecoding** assistido pelo **Google AI Studio**.
 * **Frontend**: [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Tailwind CSS v4](https://tailwindcss.com/), [Lucide Icons](https://lucide.dev/), [Motion](https://motion.dev/).
-* **Áudio & Gráficos**: Web Audio API com osciladores dinâmicos, filtros SVG/CSS customizados de tubo catódico e sombreamento esférico.
+* **Gráficos CRT**: Filtros SVG/CSS customizados de tubo catódico, brilho, curvatura 3D e vinheta óptica ajustável.
 * **Backend de Terminal**: Node.js, [WebSocket (`ws`)](https://github.com/websockets/ws), [SSH2](https://github.com/mscdex/ssh2), Net Sockets nativos e Child Process (`spawn`).
 * **Desktop Runtime**: [Electron](https://www.electronjs.org/) + [Electron Builder](https://www.electron.build/).
-* **CI/CD**: GitHub Actions com matriz de compilação cruzada para Windows, Linux e macOS com publicação automática de Releases.
+* **Mobile Runtime**: [Capacitor](https://capacitorjs.com/) para Android nativo.
+* **CI/CD**: GitHub Actions com matriz de compilação cruzada para Windows, Linux, macOS e Android com publicação automática de Releases.
 
 ---
 

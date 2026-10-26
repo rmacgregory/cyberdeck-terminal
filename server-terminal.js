@@ -244,18 +244,20 @@ export function startTerminalServer(options = {}) {
       });
     };
 
-    // SSH nativo com SSH2
-    const startSsh = (targetHost, targetPort, targetUser, targetPassword) => {
+    // SSH nativo com SSH2 (Suporte a Senha e Chaves Privadas PEM/PUB/OpenSSH)
+    const startSsh = (targetHost, targetPort, targetUser, targetPassword, privateKey = null, passphrase = '') => {
       closeRemoteSessions();
-      console.log(`[SSH2] Conectando a ${targetUser}@${targetHost}:${targetPort}`);
-      send('info', `[SSH] Autenticando ${targetUser}@${targetHost}:${targetPort}...\r\n`);
+      const authMethod = privateKey ? 'Chave Privada (PEM/OpenSSH)' : 'Senha';
+      console.log(`[SSH2] Conectando a ${targetUser}@${targetHost}:${targetPort} via ${authMethod}`);
+      send('info', `[SSH] Conectando a ${targetUser}@${targetHost}:${targetPort}...\r\n`);
+      send('dim', `[SSH] Autenticação: ${authMethod}\r\n`);
 
       const conn = new SshClient();
       activeSshClient = conn;
 
       conn.on('ready', () => {
         console.log(`[SSH2 PRONTO] Autenticado com sucesso em ${targetHost}`);
-        send('success', `[SSH CONECTADO] Sessão segura autenticada em ${targetHost}:${targetPort}\r\n`);
+        send('success', `[SSH CONECTADO] Sessão segura autenticada (${authMethod}) em ${targetHost}:${targetPort}\r\n`);
         send('session_started', { protocol: 'SSH', target: `${targetUser}@${targetHost}:${targetPort}` });
 
         conn.shell({ term: 'vt100', cols: 120, rows: 35 }, (err, stream) => {
@@ -285,13 +287,12 @@ export function startTerminalServer(options = {}) {
         activeSshClient = null;
       });
 
-      conn.connect({
+      const sshOptions = {
         host: targetHost,
         port: targetPort,
         username: targetUser,
-        password: targetPassword,
         tryKeyboard: true,
-        readyTimeout: 15000,
+        readyTimeout: 20000,
         algorithms: {
           kex: [
             'ecdh-sha2-nistp256',
@@ -320,7 +321,18 @@ export function startTerminalServer(options = {}) {
             'ssh-dss'
           ]
         }
-      });
+      };
+
+      if (privateKey) {
+        sshOptions.privateKey = privateKey;
+        if (passphrase) {
+          sshOptions.passphrase = passphrase;
+        }
+      } else if (targetPassword) {
+        sshOptions.password = targetPassword;
+      }
+
+      conn.connect(sshOptions);
     };
 
     // Dados iniciais enviados para o cliente
@@ -388,25 +400,69 @@ export function startTerminalServer(options = {}) {
             return;
           }
 
-          // Interceptador SSH
+          // Interceptador SSH (suporta -i chave.pem, -p porta, -l usuario, usuario@host)
           if (lowerCmd === 'ssh') {
-            const target = cmdParts[1];
-            if (!target) {
-              send('warning', 'Uso: ssh <host> ou ssh usuario@host\r\n');
+            let user = 'admin';
+            let host = '';
+            let port = 22;
+            let keyPath = null;
+            let privateKey = null;
+
+            for (let i = 1; i < cmdParts.length; i++) {
+              if (cmdParts[i] === '-l' && cmdParts[i + 1]) {
+                user = cmdParts[i + 1];
+                i++;
+              } else if (cmdParts[i] === '-p' && cmdParts[i + 1]) {
+                port = parseInt(cmdParts[i + 1], 10) || 22;
+                i++;
+              } else if ((cmdParts[i] === '-i' || cmdParts[i] === '--key') && cmdParts[i + 1]) {
+                keyPath = cmdParts[i + 1];
+                i++;
+              } else if (!host && !cmdParts[i].startsWith('-')) {
+                if (cmdParts[i].includes('@')) {
+                  const p = cmdParts[i].split('@');
+                  user = p[0];
+                  host = p[1];
+                } else {
+                  host = cmdParts[i];
+                }
+              }
+            }
+
+            if (!host) {
+              send('warning', 'Uso: ssh [-i chave.pem] [-p porta] [-l usuario] [usuario@]host\r\n');
               return;
             }
-            let user = 'admin';
-            let host = target;
-            let port = 22;
-            if (target.includes('@')) {
-              const p = target.split('@');
-              user = p[0];
-              host = p[1];
+
+            if (keyPath) {
+              let resolved = keyPath;
+              if (resolved === '~' || resolved.startsWith('~/')) {
+                resolved = path.join(os.homedir(), resolved.slice(1));
+              } else if (resolved.startsWith('~\\') && isWindows) {
+                resolved = path.join(os.homedir(), resolved.slice(2));
+              } else {
+                resolved = path.resolve(currentCwd, resolved);
+              }
+
+              if (fs.existsSync(resolved)) {
+                try {
+                  privateKey = fs.readFileSync(resolved, 'utf-8');
+                  send('info', `[SSH] Carregada chave privada: ${resolved}\r\n`);
+                } catch (e) {
+                  send('stderr', `[SSH] Falha ao ler chave privada em ${resolved}: ${e.message}\r\n`);
+                  return;
+                }
+              } else {
+                send('stderr', `[SSH] Arquivo de chave privada não encontrado: ${resolved}\r\n`);
+                return;
+              }
             }
-            for (let i = 2; i < cmdParts.length; i++) {
-              if (cmdParts[i] === '-l' && cmdParts[i + 1]) { user = cmdParts[i + 1]; i++; }
-              else if (cmdParts[i] === '-p' && cmdParts[i + 1]) { port = parseInt(cmdParts[i + 1], 10) || 22; i++; }
+
+            if (privateKey) {
+              startSsh(host, port, user, '', privateKey);
+              return;
             }
+
             pendingSshAuth = { host, port, user };
             send('stdout', `[SSH] Conectando a ${user}@${host}:${port}...\r\n`);
             send('stdout', `Digite a senha para ${user}@${host}: `);
@@ -477,9 +533,16 @@ export function startTerminalServer(options = {}) {
           startTelnet(msg.host, parseInt(msg.port, 10) || 23);
         }
 
-        // 3. Mensagem direta de SSH
+        // 3. Mensagem direta de SSH (suporta autenticação por senha e chave privada pem/pub)
         else if (msg.type === 'ssh') {
-          startSsh(msg.host, parseInt(msg.port, 10) || 22, msg.user || 'admin', msg.password || '');
+          startSsh(
+            msg.host,
+            parseInt(msg.port, 10) || 22,
+            msg.user || 'admin',
+            msg.password || '',
+            msg.privateKey || null,
+            msg.passphrase || ''
+          );
         }
 
         // 4. Fechar sessão remota sob demanda (exit / Ctrl+C)

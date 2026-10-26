@@ -15,6 +15,7 @@
   --crt-perspective: 1200px;
   --crt-scale: 0.992;
   --crt-radius: 20px;
+  --crt-vignette-opacity: 0.7;
 }
 
 [data-theme="amber"] {
@@ -167,6 +168,22 @@ body {
   }
 }
 
+/* Random CRT Electron Gun Jitter & Instability Animation */
+@keyframes crt-jitter {
+  0% { translate: 0px 0px; }
+  9% { translate: calc(var(--crt-jitter-max, 1px) * 0.45) calc(var(--crt-jitter-max, 1px) * -0.5); }
+  18% { translate: calc(var(--crt-jitter-max, 1px) * -0.7) calc(var(--crt-jitter-max, 1px) * 0.35); }
+  27% { translate: calc(var(--crt-jitter-max, 1px) * 0.85) calc(var(--crt-jitter-max, 1px) * 0.65); }
+  36% { translate: calc(var(--crt-jitter-max, 1px) * -0.4) calc(var(--crt-jitter-max, 1px) * -0.6); }
+  45% { translate: calc(var(--crt-jitter-max, 1px) * 0.6) calc(var(--crt-jitter-max, 1px) * 0.8); }
+  54% { translate: calc(var(--crt-jitter-max, 1px) * -0.9) calc(var(--crt-jitter-max, 1px) * -0.35); }
+  63% { translate: calc(var(--crt-jitter-max, 1px) * 0.3) calc(var(--crt-jitter-max, 1px) * 0.5); }
+  72% { translate: calc(var(--crt-jitter-max, 1px) * -0.6) calc(var(--crt-jitter-max, 1px) * -0.7); }
+  81% { translate: calc(var(--crt-jitter-max, 1px) * 0.75) calc(var(--crt-jitter-max, 1px) * 0.25); }
+  90% { translate: calc(var(--crt-jitter-max, 1px) * -0.3) calc(var(--crt-jitter-max, 1px) * 0.4); }
+  100% { translate: 0px 0px; }
+}
+
 /* The Curved Glass Tube (Cathode Ray Tube bulb) */
 .crt-real-screen {
   position: relative;
@@ -184,6 +201,8 @@ body {
     inset 0 0 35px var(--glow-color-bg),
     inset 0 2px 4px rgba(255, 255, 255, 0.12),
     inset 0 -3px 6px rgba(0, 0, 0, 0.9);
+  animation: var(--crt-jitter-animation, none);
+  will-change: translate;
   transition: all 0.3s ease;
 }
 
@@ -297,6 +316,72 @@ body[data-theme="magenta"] .crt-real-screen {
     rgba(0, 0, 0, 0.65) 88%,
     rgba(0, 0, 0, 0.95) 100%
   );
+  opacity: var(--crt-vignette-opacity, 0.7);
+  transition: opacity 0.2s ease;
+}
+
+/* Authentic CRT Hertz Scan & AC Hum Rolling Bands */
+@keyframes crt-hertz-roll {
+  0% {
+    top: 0%;
+    transform: translateY(-100%);
+  }
+  100% {
+    top: 100%;
+    transform: translateY(0%);
+  }
+}
+
+.crt-hertz-container {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 29;
+  overflow: hidden;
+  display: var(--crt-hertz-display, block);
+}
+
+.crt-hertz-band-primary {
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--crt-hertz-height, 140px);
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(0, 0, 0, 0.25) 20%,
+    rgba(0, 0, 0, 0.45) 40%,
+    var(--glow-color, rgba(0, 255, 102, 0.16)) 50%,
+    rgba(255, 255, 255, 0.15) 52%,
+    var(--glow-color, rgba(0, 255, 102, 0.12)) 56%,
+    rgba(0, 0, 0, 0.35) 75%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  mix-blend-mode: overlay;
+  animation: var(--crt-hertz-animation-primary, crt-hertz-roll 3.5s linear infinite);
+  will-change: top, transform;
+}
+
+.crt-hertz-band-secondary {
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: calc(var(--crt-hertz-height, 140px) * 0.72);
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(0, 0, 0, 0.18) 25%,
+    var(--glow-color, rgba(0, 255, 102, 0.10)) 50%,
+    rgba(255, 255, 255, 0.08) 53%,
+    rgba(0, 0, 0, 0.22) 75%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  mix-blend-mode: overlay;
+  animation: var(--crt-hertz-animation-secondary, crt-hertz-roll 3.5s linear infinite);
+  animation-delay: var(--crt-hertz-delay-secondary, -1.75s);
+  will-change: top, transform;
 }
 
 /* Subtle Cathode Ray Refresh Bar Sweep */
@@ -428,7 +513,8 @@ body[data-theme="magenta"] .crt-real-screen {
   vertical-align: sub;
   background-color: var(--glow-color);
   box-shadow: 0 0 8px var(--glow-color), 0 0 16px var(--glow-color);
-  animation: cursor-blink 0.9s infinite;
+  animation: var(--term-cursor-animation, cursor-blink 0.9s infinite);
+  transition: opacity 0.15s ease;
 }
 
 /* Terminal Output line styles */
