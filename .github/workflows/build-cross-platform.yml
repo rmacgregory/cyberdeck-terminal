@@ -95,8 +95,8 @@ jobs:
             os-name: Linux (.AppImage)
             builder-args: --linux AppImage
           - os: macos-latest
-            os-name: macOS (.dmg / .zip - Universal, Apple Silicon & Intel)
-            builder-args: --mac --universal --arm64 --x64
+            os-name: macOS (.dmg / .zip - Apple Silicon & Intel)
+            builder-args: --mac --arm64 --x64
 
     steps:
       - name: Checkout do Repositório
@@ -137,6 +137,11 @@ jobs:
 
       - name: Compilar Frontend (Vite)
         run: npm run build
+
+      - name: Limpar ferramentas de build nativas antes do empacotamento do Electron
+        shell: bash
+        run: |
+          rm -rf node_modules/@rolldown || true
 
       - name: Limpar atributos estendidos (macOS)
         if: runner.os == 'macOS'

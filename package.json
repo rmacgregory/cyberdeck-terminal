@@ -54,9 +54,7 @@
     "electron-builder": "^26.15.3",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
-    "typescript": "^7.0.2"
-  },
-  "optionalDependencies": {
+    "typescript": "^7.0.2",
     "@rolldown/binding-darwin-arm64": "^1.2.15",
     "@rolldown/binding-darwin-x64": "^1.2.15",
     "@rolldown/binding-linux-x64-gnu": "^1.2.15",
@@ -76,7 +74,8 @@
       "electron/**/*",
       "server-terminal.js",
       "server-windows-terminal.js",
-      "package.json"
+      "package.json",
+      "!**/node_modules/@rolldown/**"
     ],
     "win": {
       "target": [
@@ -126,7 +125,6 @@
         {
           "target": "dmg",
           "arch": [
-            "universal",
             "arm64",
             "x64"
           ]
@@ -134,7 +132,6 @@
         {
           "target": "zip",
           "arch": [
-            "universal",
             "arm64",
             "x64"
           ]

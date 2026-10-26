@@ -10,10 +10,10 @@ Na aba [**Releases**](https://github.com/rmacgregory/cyberdeck-terminal/releases
 
 | Arquivo | Compatibilidade | Descrição |
 | :--- | :--- | :--- |
-| **`Cyberdeck-CRT-Terminal-*-universal.dmg`** | **Todos os Macs** (Recomendado) | Imagem de disco universal que roda nativamente em Apple Silicon e Intel. |
-| **`Cyberdeck-CRT-Terminal-*-arm64.dmg`** | **Apple Silicon** | Otimizado especificamente para chips M1, M2, M3, M4. |
-| **`Cyberdeck-CRT-Terminal-*-x64.dmg`** | **Intel Mac** | Otimizado para Macs com processadores Intel (i5, i7, i9, Xeon). |
-| **`Cyberdeck-CRT-Terminal-*-universal.zip`** | **Todos os Macs** | Versão portátil compactada (basta descompactar e arrastar para Aplicativos). |
+| **`Cyberdeck-CRT-Terminal-*-arm64.dmg`** | **Apple Silicon (M1/M2/M3/M4)** | Imagem de disco (.dmg) nativa com máxima performance para Apple Silicon. |
+| **`Cyberdeck-CRT-Terminal-*-x64.dmg`** | **Mac Intel** | Imagem de disco (.dmg) nativa para computadores Mac com processador Intel. |
+| **`Cyberdeck-CRT-Terminal-*-arm64.zip`** | **Apple Silicon (M1/M2/M3/M4)** | Pacote portátil compactado para Apple Silicon. |
+| **`Cyberdeck-CRT-Terminal-*-x64.zip`** | **Mac Intel** | Pacote portátil compactado para Mac Intel. |
 
 ---
 
