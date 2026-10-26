@@ -89,10 +89,11 @@ Acesse a aba [**Releases**](https://github.com/rmacgregory/cyberdeck-terminal/re
 | 🪟 **Windows** (64-bit) | `.zip` (Portable) | **Portátil puro 64-bit nativo**: extraia e execute direto, sem instalação |
 | 🪟 **Windows** (64-bit) | `.exe` (Portable) | Executável único portátil |
 | 🐧 **Linux** (64-bit) | `.AppImage` | Portátil para Ubuntu, Debian, Fedora, Arch, etc. (`chmod +x` e rodar) |
-| 🍎 **macOS** (Universal) | `.dmg` / `.zip` | Imagem de disco instalável para Mac (Intel & Apple Silicon) |
+| 🍎 **macOS** (Universal) | `.dmg` / `.zip` | **Universal nativo para Apple Silicon (M1/M2/M3/M4) e Intel** com assinatura Ad-Hoc |
 | 📱 **Android** (Tablet/Mobile) | `.apk` | Pacote nativo único para instalação direta no seu tablet Android |
 
-Consulte o [**Guia de Uso no Android (COMO-RODAR-NO-ANDROID.md)**](./COMO-RODAR-NO-ANDROID.md) para detalhes completos de instalação no tablet e compilação do APK.
+* 🍎 **Para usuários de Mac**: Consulte o [**Guia de Uso no macOS (COMO-RODAR-NO-MAC.md)**](./COMO-RODAR-NO-MAC.md) para saber como liberar o app no Gatekeeper caso o macOS exiba o aviso padrão de "desenvolvedor não identificado" ou "app danificado".
+* 📱 **Para usuários de Android**: Consulte o [**Guia de Uso no Android (COMO-RODAR-NO-ANDROID.md)**](./COMO-RODAR-NO-ANDROID.md) para detalhes completos de instalação no tablet e compilação do APK.
 
 ---
 

@@ -95,8 +95,8 @@ jobs:
             os-name: Linux (.AppImage)
             builder-args: --linux AppImage
           - os: macos-latest
-            os-name: macOS (.dmg / .zip)
-            builder-args: --mac
+            os-name: macOS (.dmg / .zip - Universal, Apple Silicon & Intel)
+            builder-args: --mac --universal --arm64 --x64
 
     steps:
       - name: Checkout do Repositório
@@ -148,6 +148,11 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: 1
           DEBUG: electron-builder
         run: npx electron-builder ${{ matrix.builder-args }} --publish never
+
+      - name: Validar e Assegurar Assinatura Ad-Hoc nos Bundles (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          find release/ -maxdepth 3 -name "*.app" -exec codesign --force --deep --sign - {} \; 2>/dev/null || true
 
       - name: Salvar Artefatos Compilados
         uses: actions/upload-artifact@v4

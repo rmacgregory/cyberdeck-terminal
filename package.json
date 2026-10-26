@@ -123,15 +123,29 @@
     },
     "mac": {
       "target": [
-        "dmg",
-        "zip"
+        {
+          "target": "dmg",
+          "arch": [
+            "universal",
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal",
+            "arm64",
+            "x64"
+          ]
+        }
       ],
       "category": "public.app-category.developer-tools",
       "artifactName": "Cyberdeck-CRT-Terminal-${version}-${arch}.${ext}",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
-      "identity": null,
-      "forceCodeSigning": false
+      "identity": "-",
+      "forceCodeSigning": true
     },
     "dmg": {
       "format": "UDZO",
