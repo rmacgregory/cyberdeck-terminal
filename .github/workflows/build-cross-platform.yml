@@ -144,7 +144,8 @@ jobs:
   release:
     name: Publicar Release no GitHub
     needs: [build, android]
-    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release != 'false')
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout do Repositório
@@ -152,14 +153,14 @@ jobs:
 
       - name: Determinar Tag do Release
         id: release_info
+        shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag_name }}" ]; then
             TAG="${{ github.event.inputs.tag_name }}"
-            if [ -z "$TAG" ]; then
-              TAG="v1.0.${{ github.run_number }}"
-            fi
-          else
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG="${{ github.ref_name }}"
+          else
+            TAG="v1.0.${{ github.run_number }}"
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Tag definida: $TAG"
@@ -170,6 +171,7 @@ jobs:
           path: all-releases
 
       - name: Organizar e listar binários prontos
+        shell: bash
         run: |
           mkdir -p dist-releases
           find all-releases -type f \( -name "*.exe" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.zip" -o -name "*.apk" \) -exec cp {} dist-releases/ \;
@@ -184,7 +186,10 @@ jobs:
           files: dist-releases/*
           draft: false
           prerelease: false
+          make_latest: true
+          fail_on_unmatched_files: false
           generate_release_notes: true
+          target_commitish: ${{ github.sha }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
