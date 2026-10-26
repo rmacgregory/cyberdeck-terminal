@@ -27,11 +27,15 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
 * **Gerenciamento Fácil**: Abra abas pelo botão `+ Nova Aba`, atalhos de teclado ou diretamente pelos comandos `tab new`, `tab close` e painel de Acessos Rápidos.
 
 ### 🖥️ 2. Simulação CRT Avançada, Brilho, Curvatura, Jitter & Faixas de Hertz
-* **Efeito das Faixas de Hertz (Varredura Analógica / Roll Bars)**: Simulação ultra realista de interferência de frequência de rede (50Hz/60Hz AC hum e desincronização da taxa de varredura vertical) com passagem contínua de faixas luminosas e escuras pela tela. Totalmente configurável via HUD ou comandos de terminal:
-  * **Velocidade de Passagem**: De 1% (varredura ultra lenta de 15s) a 100% (flutter rápido de 0.5s).
+* **Padrão de Inicialização CRT OFF**: O terminal agora inicializa por padrão no modo **CRT OFF** (exibição moderna, plana e de alta nitidez), permitindo alternar instantaneamente para **CRT REAL** ou **CRT LEVE** pelo botão de topo ou comandos de terminal quando desejar a experiência retrô.
+* **Exibição Edge-to-Edge Limpa (Sem Moldura / Bezel)**: A antiga moldura industrial pesada de monitor foi removida, liberando 100% da área útil da janela em todos os modos, garantindo visual moderno e limpo sem obstruções visuais.
+* **Efeito das Faixas de Hertz (Varredura Analógica / Roll Bars Suaves & Quase Transparentes)**: Simulação refinada de interferência de frequência de rede (50Hz/60Hz AC hum e desincronização da taxa de varredura vertical) com passagem contínua de faixas luminosas ultra suaves e quase transparentes pela tela, preservando a legibilidade total do texto sem cansar a visão:
+  * **Transparência & Suavidade Calibradas**: Gradientes rebalanceados para serem quase transparentes (alfa ultra baixo de 2% a 7%), sem cortes pretos bruscos ou faixas agressivas.
+  * **Controle de Opacidade / Intensidade**: Ajustável de 0% (invisível) a 100% com slider e presets dedicados (*Invisível 10%*, *Suave 25%*, *Padrão 35%*, *Marcada 60%*).
+  * **Velocidade de Passagem**: De 1% (varredura ultra lenta e relaxante de 15s) a 100% (flutter rápido de 0.5s).
   * **Largura das Faixas**: De 5% (linhas de feixe finas de 30px) a 100% (macrofaixas de interferência de 420px).
-  * **Presets Rápidos**: *50Hz Drift*, *60Hz Clássico*, *Interferência AC* e *Desync Total*.
-  * Comandos de Terminal: `hertz <velocidade> [largura]`, `hertz speed <1-100>`, `hertz width <5-100>`, `hertz 60hz`, `hertz off/on`.
+  * **Presets Rápidos**: *Ultra Suave*, *50Hz Drift*, *60Hz CRT Clássico* e *Interferência AC*.
+  * Comandos de Terminal: `hertz <velocidade> [largura]`, `hertz opacity <0-100>`, `hertz speed <1-100>`, `hertz width <5-100>`, `hertz suave`, `hertz 60hz`, `hertz off/on`.
 * **Tremor da Imagem (Jitter do Tubo CRT)**: Animação CSS de instabilidade aleatória do canhão de elétrons ajustável de 0% (imagem estável) a 100% (caos vintage), configurável pelo HUD ou comando `jitter <0-100|off>`.
 * **Controle Dinâmico de Brilho**: Ajuste fino da luminosidade do monitor CRT de 70% a 200% via slider na interface ou comando `brightness <valor>`.
 * **Curvatura do Tubo Regulável**: Intensidade da distorção esférica ajustável de 0% (plano total) até 100% (tubo esférico vintage acentuado) via slider ou comando `curve <0-100>`.
@@ -40,7 +44,6 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
 * **Configurações Unificadas de Tela & Tipografia**: Fontes, tamanhos e espaçamento agora acessíveis diretamente dentro do menu de configurações CRT.
 * **Brilho de Fósforo & Bloom Intenso**: Efeito de irradiação de luz nos caracteres (`Extreme`, `Normal`, `Soft`).
 * **Linhas de Varredura (Scanlines & Aperture Grille)**: Efeito clássico de tubo de raios catódicos com subpixels RGB analógicos.
-* **Moldura Vintage (Bezel)**: Carcaça industrial tática ao redor da tela, alternável com um clique.
 * **4 Temas de Cores de Fósforo**:
   * 🟢 **Matrix Green**: O lendário verde fósforo P1 (#00ff66).
   * 🟡 **Amber CRT**: Fósforo âmbar clássico de estações industriais (#ffb000).
@@ -68,6 +71,7 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
 * No modo Desktop (Electron), o servidor backend é iniciado automaticamente em segundo plano.
 
 ### 📡 6. Protocolos de Rede, Chaves SSH & Autocompletação Inteligente
+* **Varredura de Sub-rede ICMP (Ping-Sweep)**: Comando `ping-sweep <sub-rede/CIDR>` (ex: `ping-sweep 192.168.1.0/24`, `10.0.0.0/24`, `172.16.1.0/24`) para descobrir e mapear todos os dispositivos ativos da rede local em tempo real, exibindo tabela formatada com status `[ONLINE]`, IP, tempo de resposta (RTT em ms), identificação de hardware e endereço MAC, com resumo estatístico ao final.
 * **SSH Integrado com Chaves Privadas (PEM / OpenSSH / RSA / Ed25519)**: Conexão direta por senha ou arquivo de chave (`ssh -i chave.pem usuario@host -p 22`) e leitor de arquivos no modal de conexões rápidas.
 * **Autocompletação por Equipamento (`[TAB]`)**: O terminal detecta se você está conectado a roteadores e switches (Cisco IOS, MikroTik RouterOS, Huawei VRP, Juniper JunOS) ou servidores (Linux/Windows) e autocompleta os comandos nativos do dispositivo.
 * **Telnet & Raw TCP Socket**: Conexões diretas de socket com dispositivos legados, BBS e consoles de infraestrutura (`telnet host porta`).

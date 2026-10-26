@@ -128,45 +128,6 @@ body {
    AUTHENTIC VINTAGE CRT MONITOR (Cool-Retro-Term Style - image_42a73025.png)
    ========================================================================== */
 
-/* Physical Outer Bezel Chassis (The heavy plastic/metal casing of the CRT monitor) */
-.crt-real-chassis {
-  background: linear-gradient(145deg, #1f2327 0%, #131518 50%, #0d0f11 100%);
-  border-radius: 28px;
-  padding: 12px 14px 16px 14px;
-  box-shadow:
-    0 25px 60px -15px rgba(0, 0, 0, 0.95),
-    0 0 0 2px #2a2e33,
-    inset 0 2px 3px rgba(255, 255, 255, 0.18),
-    inset 0 -4px 8px rgba(0, 0, 0, 0.85);
-  position: relative;
-  transition: all 0.3s ease;
-}
-
-@media (max-width: 640px) {
-  .crt-real-chassis {
-    padding: 6px 6px 8px 6px;
-    border-radius: 16px;
-  }
-}
-
-/* Recessed Bezel Groove right around the glass tube */
-.crt-bezel-recess {
-  background: #08090b;
-  border-radius: 22px;
-  padding: 3px;
-  box-shadow:
-    inset 0 4px 12px rgba(0, 0, 0, 0.95),
-    inset 0 -2px 6px rgba(255, 255, 255, 0.05),
-    0 1px 0 rgba(255, 255, 255, 0.08);
-  position: relative;
-}
-
-@media (max-width: 640px) {
-  .crt-bezel-recess {
-    border-radius: 12px;
-    padding: 2px;
-  }
-}
 
 /* Random CRT Electron Gun Jitter & Instability Animation */
 @keyframes crt-jitter {
@@ -339,6 +300,8 @@ body[data-theme="magenta"] .crt-real-screen {
   z-index: 29;
   overflow: hidden;
   display: var(--crt-hertz-display, block);
+  opacity: var(--crt-hertz-opacity, 0.30);
+  transition: opacity 0.25s ease;
 }
 
 .crt-hertz-band-primary {
@@ -350,12 +313,12 @@ body[data-theme="magenta"] .crt-real-screen {
   background: linear-gradient(
     to bottom,
     rgba(255, 255, 255, 0) 0%,
-    rgba(0, 0, 0, 0.25) 20%,
-    rgba(0, 0, 0, 0.45) 40%,
-    var(--glow-color, rgba(0, 255, 102, 0.16)) 50%,
-    rgba(255, 255, 255, 0.15) 52%,
-    var(--glow-color, rgba(0, 255, 102, 0.12)) 56%,
-    rgba(0, 0, 0, 0.35) 75%,
+    rgba(0, 0, 0, 0.04) 20%,
+    rgba(0, 0, 0, 0.07) 38%,
+    var(--glow-color, rgba(0, 255, 102, 0.05)) 50%,
+    rgba(255, 255, 255, 0.04) 52%,
+    var(--glow-color, rgba(0, 255, 102, 0.04)) 56%,
+    rgba(0, 0, 0, 0.05) 75%,
     rgba(255, 255, 255, 0) 100%
   );
   mix-blend-mode: overlay;
@@ -372,10 +335,10 @@ body[data-theme="magenta"] .crt-real-screen {
   background: linear-gradient(
     to bottom,
     rgba(255, 255, 255, 0) 0%,
-    rgba(0, 0, 0, 0.18) 25%,
-    var(--glow-color, rgba(0, 255, 102, 0.10)) 50%,
-    rgba(255, 255, 255, 0.08) 53%,
-    rgba(0, 0, 0, 0.22) 75%,
+    rgba(0, 0, 0, 0.025) 25%,
+    var(--glow-color, rgba(0, 255, 102, 0.035)) 50%,
+    rgba(255, 255, 255, 0.025) 53%,
+    rgba(0, 0, 0, 0.03) 75%,
     rgba(255, 255, 255, 0) 100%
   );
   mix-blend-mode: overlay;
@@ -401,11 +364,11 @@ body[data-theme="magenta"] .crt-real-screen {
   background: linear-gradient(
     to bottom,
     transparent 0%,
-    rgba(255, 255, 255, 0.06) 50%,
+    rgba(255, 255, 255, 0.03) 50%,
     transparent 100%
   );
   animation: crt-roll 10s linear infinite;
-  opacity: 0.7;
+  opacity: 0.45;
 }
 
 /* Phosphor Bloom (High Luminescence text glow like in image_42a73025.png) */
@@ -525,3 +488,7 @@ body[data-theme="magenta"] .crt-real-screen {
 .line-info { color: #00d9ff; text-shadow: 0 0 6px rgba(0, 217, 255, 0.6); }
 .line-success { color: #22ff88; text-shadow: 0 0 8px rgba(34, 255, 136, 0.6); }
 .line-cmd { color: #ffffff; font-weight: bold; }
+
+
+
+

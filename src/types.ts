@@ -52,13 +52,13 @@ export interface CrtConfig {
   brightness: number; // 70 a 200%
   vignetteIntensity: number; // 0 a 100%
   cursorBlinkRate: number; // 0 = sem piscar (estático), 0.25 a 2.0s
-  bezel: boolean;
   scanlines: boolean;
   jitter: boolean;
   jitterIntensity: number; // 0 a 100%
   hertz: boolean; // Efeito das faixas de varredura Hertz passando na tela
   hertzSpeed: number; // Velocidade das faixas (1 a 100)
   hertzWidth: number; // Largura / espessura das faixas (5 a 100)
+  hertzIntensity?: number; // Intensidade / opacidade das faixas (0 a 100%, padrão suave ~30%)
 }
 
 export interface SystemMetrics {

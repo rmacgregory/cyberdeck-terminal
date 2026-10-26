@@ -903,21 +903,89 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
                       </div>
                     </div>
 
+                    {/* 3. Opacidade / Transparência das Faixas */}
+                    <div className="space-y-1 bg-black/40 p-2 rounded border border-zinc-800/80">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-zinc-400 font-bold">Transparência / Intensidade:</span>
+                        <span className="text-cyan-300 font-mono font-bold">
+                          {crtConfig.hertzIntensity ?? 30}% ({(crtConfig.hertzIntensity ?? 30) <= 25 ? 'Ultra Suave' : (crtConfig.hertzIntensity ?? 30) <= 45 ? 'Suave' : 'Marcada'})
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const nextVal = Math.max(0, (crtConfig.hertzIntensity ?? 30) - 5);
+                            onCrtConfigChange({ hertz: nextVal > 0, hertzIntensity: nextVal });
+                          }}
+                          title="Tornar faixas mais transparentes e suaves"
+                          className="w-6 h-6 rounded border border-zinc-800 bg-zinc-900 hover:border-cyan-400 text-zinc-300 flex items-center justify-center font-bold text-xs"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="5"
+                          value={crtConfig.hertzIntensity ?? 30}
+                          onChange={(e) =>
+                            onCrtConfigChange({
+                              hertz: true,
+                              hertzIntensity: parseInt(e.target.value, 10),
+                            })
+                          }
+                          className="flex-1 accent-cyan-400 cursor-pointer h-1.5 bg-zinc-800 rounded-lg"
+                        />
+                        <button
+                          onClick={() => {
+                            const nextVal = Math.min(100, (crtConfig.hertzIntensity ?? 30) + 5);
+                            onCrtConfigChange({ hertz: true, hertzIntensity: nextVal });
+                          }}
+                          title="Aumentar intensidade das faixas"
+                          className="w-6 h-6 rounded border border-zinc-800 bg-zinc-900 hover:border-cyan-400 text-zinc-300 flex items-center justify-center font-bold text-xs"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      {/* Presets de Opacidade */}
+                      <div className="grid grid-cols-4 gap-1 pt-0.5">
+                        {[
+                          { label: 'Invisível (10%)', val: 10 },
+                          { label: 'Suave (25%)', val: 25 },
+                          { label: 'Padrão (35%)', val: 35 },
+                          { label: 'Marcada (60%)', val: 60 },
+                        ].map((item) => (
+                          <button
+                            key={item.label}
+                            onClick={() => onCrtConfigChange({ hertz: true, hertzIntensity: item.val })}
+                            className={`py-0.5 px-1 rounded text-[9px] font-mono border text-center transition-all truncate ${
+                              (crtConfig.hertzIntensity ?? 30) === item.val && crtConfig.hertz
+                                ? 'border-cyan-400 bg-cyan-500/25 text-cyan-200 font-bold'
+                                : 'border-zinc-800 text-zinc-500 hover:text-zinc-300'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Presets Combinados de Hertz */}
                     <div className="grid grid-cols-5 gap-1 pt-0.5">
                       {[
-                        { label: 'Off', hertz: false, speed: 0, width: 40 },
-                        { label: '50Hz Drift', hertz: true, speed: 25, width: 30 },
-                        { label: '60Hz CRT', hertz: true, speed: 45, width: 40 },
-                        { label: 'Interferência', hertz: true, speed: 75, width: 65 },
-                        { label: 'Desync Total', hertz: true, speed: 95, width: 90 },
+                        { label: 'Off', hertz: false, speed: 0, width: 40, intensity: 0 },
+                        { label: 'Ultra Suave', hertz: true, speed: 30, width: 35, intensity: 20 },
+                        { label: '50Hz Drift', hertz: true, speed: 25, width: 30, intensity: 25 },
+                        { label: '60Hz CRT', hertz: true, speed: 45, width: 40, intensity: 30 },
+                        { label: 'Interferência', hertz: true, speed: 70, width: 60, intensity: 45 },
                       ].map((preset) => (
                         <button
                           key={preset.label}
                           onClick={() =>
                             onCrtConfigChange({
                               hertz: preset.hertz,
-                              ...(preset.hertz ? { hertzSpeed: preset.speed, hertzWidth: preset.width } : {}),
+                              ...(preset.hertz ? { hertzSpeed: preset.speed, hertzWidth: preset.width, hertzIntensity: preset.intensity } : {}),
                             })
                           }
                           className={`py-0.5 px-1 rounded text-[9px] font-mono border text-center transition-all truncate ${
@@ -938,15 +1006,6 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
 
                   {/* Toggles */}
                   <div className="space-y-2 pt-1 border-t border-zinc-900 text-zinc-300 text-[11px]">
-                    <label className="flex items-center justify-between cursor-pointer">
-                      <span>Moldura de Monitor Vintage (Bezel)</span>
-                      <input
-                        type="checkbox"
-                        checked={crtConfig.bezel}
-                        onChange={(e) => onCrtConfigChange({ bezel: e.target.checked })}
-                        className="accent-emerald-500 rounded cursor-pointer"
-                      />
-                    </label>
                     <label className="flex items-center justify-between cursor-pointer">
                       <span>Grade de Fósforo (Aperture Grille)</span>
                       <input

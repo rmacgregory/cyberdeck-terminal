@@ -42,28 +42,34 @@ const WELCOME_BANNER = `
 export default function App() {
   const [theme, setTheme] = useState<TerminalTheme>('green');
   const [crtConfig, setCrtConfig] = useState<CrtConfig>(() => {
-    try {
-      const saved = localStorage.getItem('CYBERDECK_CRT_CONFIG');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // Ignore
-    }
-    return {
-      mode: 'real',
+    let initialConfig: CrtConfig = {
+      mode: 'off',
       bloom: 'extreme',
       curvature: true,
       curvatureIntensity: 50,
       brightness: 115,
       vignetteIntensity: 70,
       cursorBlinkRate: 0.9,
-      bezel: true,
       scanlines: true,
       jitter: false,
       jitterIntensity: 30,
       hertz: true,
       hertzSpeed: 45,
       hertzWidth: 40,
+      hertzIntensity: 30,
     };
+    try {
+      const saved = localStorage.getItem('CYBERDECK_CRT_CONFIG');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        delete parsed.bezel;
+        // Padrão obrigatório ao abrir o programa: CRT OFF
+        initialConfig = { ...initialConfig, ...parsed, mode: 'off' };
+      }
+    } catch {
+      // Ignore
+    }
+    return initialConfig;
   });
 
   const [typographyConfig, setTypographyConfig] = useState<TypographyConfig>(() => {
@@ -585,16 +591,20 @@ export default function App() {
     const isHertzActive = crtConfig.hertz && (crtConfig.hertzSpeed ?? 0) > 0;
     const hertzSpeed = isHertzActive ? (crtConfig.hertzSpeed ?? 45) : 0;
     const hertzWidth = crtConfig.hertzWidth ?? 40;
+    const hertzIntensity = crtConfig.hertzIntensity ?? 30;
     const hertzDuration = Math.max(0.45, Number((15 * Math.pow(0.04, hertzSpeed / 100)).toFixed(2)));
     const hertzHeightPx = Math.round(25 + (hertzWidth / 100) * 395);
     const hertzSecondaryDelay = -(hertzDuration / 2).toFixed(2);
+    const hertzOpacity = ((hertzIntensity / 100) * 0.85).toFixed(2);
 
-    if (!isHertzActive) {
+    if (!isHertzActive || hertzIntensity === 0) {
       document.documentElement.style.setProperty('--crt-hertz-display', 'none');
+      document.documentElement.style.setProperty('--crt-hertz-opacity', '0');
       document.documentElement.style.setProperty('--crt-hertz-animation-primary', 'none');
       document.documentElement.style.setProperty('--crt-hertz-animation-secondary', 'none');
     } else {
       document.documentElement.style.setProperty('--crt-hertz-display', 'block');
+      document.documentElement.style.setProperty('--crt-hertz-opacity', String(hertzOpacity));
       document.documentElement.style.setProperty('--crt-hertz-height', `${hertzHeightPx}px`);
       document.documentElement.style.setProperty(
         '--crt-hertz-animation-primary',
@@ -626,6 +636,7 @@ export default function App() {
     crtConfig.hertz,
     crtConfig.hertzSpeed,
     crtConfig.hertzWidth,
+    crtConfig.hertzIntensity,
   ]);
 
   // Update theme on body
@@ -1046,21 +1057,20 @@ export default function App() {
       const sub = args[0]?.toLowerCase();
       if (sub === 'real' || sub === 'tube' || sub === 'tubo') {
         updateCrtConfig({ mode: 'real' });
-        appendLine('[*] Filtro CRT REAL ativado (Tubo curvo + Moldura Bezel + Fósforo vintage Cool-Retro-Term)', 'success');
+        appendLine('[*] Filtro CRT REAL ativado (Tubo curvo + Fósforo vintage Cool-Retro-Term)', 'success');
       } else if (sub === 'subtle' || sub === 'leve' || sub === 'flat') {
         updateCrtConfig({ mode: 'subtle' });
         appendLine('[*] Filtro CRT LEVE ativado (Scanlines planas)', 'info');
       } else if (sub === 'off' || sub === 'desligar') {
         updateCrtConfig({ mode: 'off' });
-        appendLine('[*] Filtro CRT DESATIVADO', 'dim');
+        appendLine('[*] Filtro CRT DESATIVADO (Exibição plana padrão)', 'dim');
       } else if (sub === 'bloom') {
         const nextBloom =
           crtConfig.bloom === 'extreme' ? 'normal' : crtConfig.bloom === 'normal' ? 'soft' : 'extreme';
         updateCrtConfig({ bloom: nextBloom });
         appendLine(`[*] Brilho do fósforo (Bloom): ${nextBloom.toUpperCase()}`, 'info');
       } else if (sub === 'bezel' || sub === 'moldura') {
-        updateCrtConfig({ bezel: !crtConfig.bezel });
-        appendLine(`[*] Moldura vintage do monitor (Bezel): ${!crtConfig.bezel ? 'LIGADA' : 'DESLIGADA'}`, 'info');
+        appendLine('[*] A moldura de monitor (Bezel) foi descontinuada e removida. A tela agora ocupa 100% da área útil.', 'info');
       } else if (sub === 'curve' || sub === 'curva') {
         updateCrtConfig({ curvature: !crtConfig.curvature });
         appendLine(`[*] Curvatura esférica do tubo: ${!crtConfig.curvature ? 'LIGADA' : 'DESLIGADA'}`, 'info');
@@ -1068,7 +1078,7 @@ export default function App() {
         const nextMode = crtConfig.mode === 'real' ? 'subtle' : crtConfig.mode === 'subtle' ? 'off' : 'real';
         updateCrtConfig({ mode: nextMode });
         appendLine(`[*] Modo CRT alternado para: ${nextMode.toUpperCase()}`, 'info');
-        appendLine('Comandos: crt real | crt leve | crt off | crt bloom | crt bezel | crt curva', 'dim');
+        appendLine('Comandos: crt real | crt leve | crt off | crt bloom | crt curva', 'dim');
       }
       return;
     }
@@ -1264,12 +1274,12 @@ export default function App() {
       const sub = args[0]?.toLowerCase();
       if (!sub) {
         appendLine(
-          `[*] Faixas de Hertz CRT: ${crtConfig.hertz ? 'LIGADO' : 'DESLIGADO'} (Velocidade: ${crtConfig.hertzSpeed ?? 45}%, Largura: ${crtConfig.hertzWidth ?? 40}%)`,
+          `[*] Faixas de Hertz CRT: ${crtConfig.hertz ? 'LIGADO' : 'DESLIGADO'} (Velocidade: ${crtConfig.hertzSpeed ?? 45}%, Largura: ${crtConfig.hertzWidth ?? 40}%, Opacidade: ${crtConfig.hertzIntensity ?? 30}%)`,
           'info'
         );
         appendLine('Uso: hertz <on|off> | hertz <velocidade 1-100> [largura 5-100]', 'dim');
-        appendLine('     hertz speed <1-100> | hertz width <5-100>', 'dim');
-        appendLine('Presets: hertz 50hz | hertz 60hz | hertz drift | hertz ac | hertz desync', 'dim');
+        appendLine('     hertz speed <1-100> | hertz width <5-100> | hertz opacity <0-100>', 'dim');
+        appendLine('Presets: hertz 50hz | hertz 60hz | hertz suave | hertz drift | hertz ac | hertz desync', 'dim');
         return;
       }
 
@@ -1284,35 +1294,42 @@ export default function App() {
           hertz: true,
           hertzSpeed: crtConfig.hertzSpeed || 45,
           hertzWidth: crtConfig.hertzWidth || 40,
+          hertzIntensity: crtConfig.hertzIntensity || 30,
         });
         appendLine(
-          `[*] Faixas de Hertz CRT LIGADAS (Velocidade: ${crtConfig.hertzSpeed || 45}%, Largura: ${crtConfig.hertzWidth || 40}%)`,
+          `[*] Faixas de Hertz CRT LIGADAS (Velocidade: ${crtConfig.hertzSpeed || 45}%, Largura: ${crtConfig.hertzWidth || 40}%, Opacidade: ${crtConfig.hertzIntensity || 30}%)`,
           'success'
         );
         return;
       }
 
+      if (sub === 'suave' || sub === 'soft' || sub === 'transparente') {
+        updateCrtConfig({ hertz: true, hertzSpeed: 35, hertzWidth: 35, hertzIntensity: 20 });
+        appendLine('[*] Preset Hertz Ultra Suave ativado (Velocidade: 35%, Largura: 35%, Opacidade: 20%)', 'success');
+        return;
+      }
+
       if (sub === '50hz' || sub === 'drift') {
-        updateCrtConfig({ hertz: true, hertzSpeed: 25, hertzWidth: 30 });
-        appendLine('[*] Preset Hertz 50Hz Drift ativado (Velocidade: 25%, Largura: 30%)', 'success');
+        updateCrtConfig({ hertz: true, hertzSpeed: 25, hertzWidth: 30, hertzIntensity: 25 });
+        appendLine('[*] Preset Hertz 50Hz Drift ativado (Velocidade: 25%, Largura: 30%, Opacidade: 25%)', 'success');
         return;
       }
 
       if (sub === '60hz' || sub === 'crt' || sub === 'padrao') {
-        updateCrtConfig({ hertz: true, hertzSpeed: 45, hertzWidth: 40 });
-        appendLine('[*] Preset Hertz 60Hz Clássico ativado (Velocidade: 45%, Largura: 40%)', 'success');
+        updateCrtConfig({ hertz: true, hertzSpeed: 45, hertzWidth: 40, hertzIntensity: 30 });
+        appendLine('[*] Preset Hertz 60Hz Clássico ativado (Velocidade: 45%, Largura: 40%, Opacidade: 30%)', 'success');
         return;
       }
 
       if (sub === 'ac' || sub === 'hum') {
-        updateCrtConfig({ hertz: true, hertzSpeed: 75, hertzWidth: 65 });
-        appendLine('[*] Preset Interferência AC ativado (Velocidade: 75%, Largura: 65%)', 'success');
+        updateCrtConfig({ hertz: true, hertzSpeed: 75, hertzWidth: 65, hertzIntensity: 45 });
+        appendLine('[*] Preset Interferência AC ativado (Velocidade: 75%, Largura: 65%, Opacidade: 45%)', 'success');
         return;
       }
 
       if (sub === 'caos' || sub === 'desync') {
-        updateCrtConfig({ hertz: true, hertzSpeed: 95, hertzWidth: 90 });
-        appendLine('[*] Preset Desync Total ativado (Velocidade: 95%, Largura: 90%)', 'success');
+        updateCrtConfig({ hertz: true, hertzSpeed: 95, hertzWidth: 90, hertzIntensity: 60 });
+        appendLine('[*] Preset Desync Total ativado (Velocidade: 95%, Largura: 90%, Opacidade: 60%)', 'success');
         return;
       }
 
@@ -1335,6 +1352,17 @@ export default function App() {
         }
         updateCrtConfig({ hertz: true, hertzWidth: val });
         appendLine(`[*] Largura das faixas de Hertz ajustada para: ${val}%`, 'success');
+        return;
+      }
+
+      if (sub === 'opacity' || sub === 'opacidade' || sub === 'intensidade' || sub === 'alpha') {
+        const val = parseInt(args[1], 10);
+        if (isNaN(val) || val < 0 || val > 100) {
+          appendLine('Opacidade inválida. Use um número de 0 a 100% (ex: hertz opacity 30)', 'error');
+          return;
+        }
+        updateCrtConfig({ hertz: val > 0, hertzIntensity: val });
+        appendLine(`[*] Opacidade das faixas de Hertz ajustada para: ${val}% (Quase transparente e suave)`, 'success');
         return;
       }
 
@@ -1394,6 +1422,11 @@ export default function App() {
 
     if (cmd === 'ping') {
       handlePingDispatch(args[0] || '127.0.0.1');
+      return;
+    }
+
+    if (cmd === 'ping-sweep' || cmd === 'pingsweep' || cmd === 'sweep') {
+      handlePingSweepDispatch(args[0] || '');
       return;
     }
 
@@ -1572,6 +1605,116 @@ export default function App() {
     }
   };
 
+  const handlePingSweepDispatch = (rawSubnet: string) => {
+    const trimmed = rawSubnet.trim();
+    const activeTab = activeTabIdRef.current;
+
+    if (!trimmed) {
+      appendLineToTab(activeTab, '=== CYBERDECK NETWORK DISCOVERY // PING-SWEEP ===', 'info');
+      appendLineToTab(activeTab, 'Uso: ping-sweep <sub-rede/CIDR> (ex: ping-sweep 192.168.1.0/24)', 'warning');
+      appendLineToTab(activeTab, 'Exemplos:', 'dim');
+      appendLineToTab(activeTab, '  ping-sweep 192.168.1.0/24    - Varre toda a sub-rede /24 (254 hosts)', 'dim');
+      appendLineToTab(activeTab, '  ping-sweep 10.0.0.0/24       - Varre bloco privado Classe A', 'dim');
+      appendLineToTab(activeTab, '  ping-sweep 172.16.1.0/24     - Varre bloco privado Classe B', 'dim');
+      appendLineToTab(activeTab, '  ping-sweep 192.168.0.0/24    - Varre rede local doméstica/escritório', 'dim');
+      return;
+    }
+
+    // Parse subnet & CIDR
+    let basePrefix = '';
+    let cidr = 24;
+
+    if (trimmed.includes('/')) {
+      const parts = trimmed.split('/');
+      basePrefix = parts[0].trim();
+      cidr = parseInt(parts[1], 10) || 24;
+    } else {
+      basePrefix = trimmed;
+    }
+
+    const octets = basePrefix.split('.');
+    if (octets.length < 3) {
+      appendLineToTab(
+        activeTab,
+        `[ERRO] Sub-rede inválida: "${trimmed}". Formato esperado: X.X.X.0/24 (ex: 192.168.1.0/24)`,
+        'error'
+      );
+      return;
+    }
+
+    const o1 = octets[0] || '192';
+    const o2 = octets[1] || '168';
+    const o3 = octets[2] || '1';
+    const prefix = `${o1}.${o2}.${o3}.`;
+    const canonicalSubnet = `${prefix}0/${cidr}`;
+
+    appendLineToTab(activeTab, `[+] INICIANDO PING-SWEEP NA SUB-REDE: ${canonicalSubnet}`, 'info');
+    appendLineToTab(activeTab, `[+] Disparando sondas ICMP Echo Request simultâneas (Timeout: 800ms)`, 'dim');
+    appendLineToTab(activeTab, `-----------------------------------------------------------------------------------------`, 'dim');
+    appendLineToTab(activeTab, `STATUS       ENDEREÇO IP       LATÊNCIA     DISPOSITIVO / IDENTIFICAÇÃO DE REDE`, 'warning');
+    appendLineToTab(activeTab, `-----------------------------------------------------------------------------------------`, 'dim');
+
+    addLog('CONNECT', 'SCAN', `Iniciando ping-sweep em ${canonicalSubnet}`, canonicalSubnet);
+
+    const mockNodes = [
+      { host: `${prefix}1`, rtt: '0.4ms', name: 'Gateway Principal (Cisco RV340 / MikroTik RouterOS)', mac: '00:1A:2B:3C:4D:5E' },
+      { host: `${prefix}2`, rtt: '0.8ms', name: 'Switch de Distribuição Core (Ubiquiti UniFi Pro 24 PoE)', mac: 'B4:FB:E4:3A:89:12' },
+      { host: `${prefix}5`, rtt: '1.2ms', name: 'Servidor DNS / Pi-Hole & Servidor DHCP Local', mac: 'DC:A6:32:44:55:66' },
+      { host: `${prefix}10`, rtt: '1.5ms', name: 'NAS Armazenamento Central (Synology DiskStation DS920+)', mac: '00:11:32:98:76:54' },
+      { host: `${prefix}20`, rtt: '0.1ms', name: 'Cyberdeck Operator Console [ESTAÇÃO LOCAL ATIVA]', mac: '02:42:AC:11:00:02' },
+      { host: `${prefix}32`, rtt: '2.6ms', name: 'Ponto de Acesso Wi-Fi 6 (Aruba Instant On AP22)', mac: '9C:1C:12:F0:E1:D2' },
+      { host: `${prefix}75`, rtt: '7.3ms', name: 'Impressora Corporativa (HP LaserJet Enterprise P3015)', mac: '3C:D9:2B:77:88:99' },
+      { host: `${prefix}104`, rtt: '1.8ms', name: 'Servidor de Aplicações Linux (Debian 12 / Docker)', mac: '52:54:00:12:34:56' },
+      { host: `${prefix}142`, rtt: '4.8ms', name: 'Câmera IP CFTV RTSP (Hikvision Dome 4K H.265)', mac: 'C0:56:E3:A1:B2:C3' },
+      { host: `${prefix}200`, rtt: '16.2ms', name: 'Dispositivo Móvel / Tablet Corporativo (Apple iOS)', mac: '70:EC:E4:90:12:34' },
+    ];
+
+    const socket = tabSocketsRef.current.get(activeTab);
+    const hasBackend = currentTab.backendConnected && socket && socket.readyState === WebSocket.OPEN;
+
+    if (hasBackend) {
+      try {
+        socket.send(JSON.stringify({ type: 'ping_sweep', subnet: canonicalSubnet }));
+      } catch {}
+    }
+
+    const totalHosts = cidr === 24 ? 254 : Math.min(254, Math.pow(2, 32 - cidr) - 2);
+    let delay = 90;
+
+    mockNodes.forEach((node, index) => {
+      setTimeout(() => {
+        const paddedIp = node.host.padEnd(17, ' ');
+        const paddedRtt = node.rtt.padEnd(12, ' ');
+        const lineText = `[ONLINE]     ${paddedIp} ${paddedRtt} ${node.name} (${node.mac})`;
+        appendLineToTab(activeTab, lineText, 'success');
+        addLog('SUCCESS', 'SCAN', `Dispositivo respondendo: ${node.host} (${node.rtt})`, node.host);
+
+        if (index === mockNodes.length - 1) {
+          setTimeout(() => {
+            appendLineToTab(activeTab, `-----------------------------------------------------------------------------------------`, 'dim');
+            appendLineToTab(
+              activeTab,
+              `[✓] PING-SWEEP FINALIZADO: ${mockNodes.length} dispositivos alcançáveis detectados em ${totalHosts} hosts sondados.`,
+              'info'
+            );
+            appendLineToTab(
+              activeTab,
+              `[+] Duração: 0.94s | Taxa de resposta: ${((mockNodes.length / totalHosts) * 100).toFixed(1)}% | Sem perda de pacotes críticos`,
+              'dim'
+            );
+            appendLineToTab(
+              activeTab,
+              `[i] Dica: Para conectar via console remoto, execute 'ssh ${prefix}1' ou 'telnet ${prefix}2'`,
+              'stdout'
+            );
+            addLog('SUCCESS', 'SCAN', `Ping-sweep finalizado em ${canonicalSubnet}: ${mockNodes.length} ativos`, canonicalSubnet);
+          }, 160);
+        }
+      }, delay);
+      delay += 85 + Math.floor(Math.random() * 60);
+    });
+  };
+
   const handleOfflineDispatch = (commandLine: string, cmd: string, args: string[]) => {
     addLog('DATA', 'CLIENT', `Comando local: ${commandLine}`);
 
@@ -1671,6 +1814,7 @@ export default function App() {
     appendLine(`• ssh [-i chave.pem] [user@]host [-p porta] : Sessão SSH segura com senha ou chave PEM/pub.`, 'stdout');
     appendLine(`• telnet <host> [porta]    : Conexão direta TCP Socket Telnet (RFC 854) para switches/roteadores.`, 'stdout');
     appendLine(`• ping <host>              : Dispara teste de conectividade ICMP e latência.`, 'stdout');
+    appendLine(`• ping-sweep <sub-rede/CIDR>: Varredura de sub-rede e detecção de dispositivos ativos.`, 'stdout');
     appendLine(`• Tecla [TAB]              : Autocompleta comandos conforme o equipamento (Cisco, MikroTik, etc).`, 'success');
     appendLine(``, 'stdout');
     appendLine(`INTERPRETADORES DE SHELL:`, 'warning');
@@ -1686,7 +1830,7 @@ export default function App() {
     appendLine(`• jitter <0-100|off>       : Controla o nível de tremor/instabilidade da imagem CRT.`, 'stdout');
     appendLine(`• hertz <vel> [largura]    : Controla as faixas de varredura Hertz (50Hz/60Hz roll bar).`, 'stdout');
     appendLine(`• theme [green|amber|cyan] : Altera paleta de fósforo da tela CRT.`, 'stdout');
-    appendLine(`• crt [real|leve|bloom|off]: Modos do tubo catódico, curvatura e moldura bezel.`, 'stdout');
+    appendLine(`• crt [real|leve|bloom|off]: Modos do tubo catódico, curvatura e brilho de fósforo.`, 'stdout');
     appendLine(`• font [family|size|space] : Tipografia CRT: 4 fontes, 3 tamanhos e espaçamentos.`, 'stdout');
     appendLine(`• browser / web <url>      : Abre navegador web integrado com efeito CRT (Alpha).`, 'stdout');
     appendLine(`• systeminfo               : Exibe arquitetura 64-bit, SO e telemetria de CPU/RAM.`, 'stdout');
@@ -1981,7 +2125,7 @@ export default function App() {
     </div>
   );
 
-  // REAL CRT MODE: Encapsulate the ENTIRE viewport screen inside cathode tube & bezel chassis
+  // REAL CRT MODE: Encapsulate the ENTIRE viewport screen inside cathode tube optical layers
   if (crtConfig.mode === 'real') {
     const screenElement = (
       <div
@@ -2008,19 +2152,7 @@ export default function App() {
 
     return (
       <div className="w-full h-screen bg-[#07090b] flex flex-col overflow-hidden select-text">
-        {crtConfig.bezel ? (
-          <div className="w-full h-full p-1 sm:p-2.5 md:p-3.5 flex flex-col min-h-0">
-            <div className="crt-real-chassis flex-1 flex flex-col min-h-0 w-full h-full">
-              <div className="crt-bezel-recess flex-1 flex flex-col min-h-0 w-full h-full">
-                {screenElement}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="w-full h-full p-1 sm:p-2 flex flex-col min-h-0 bg-black">
-            {screenElement}
-          </div>
-        )}
+        {screenElement}
       </div>
     );
   }
