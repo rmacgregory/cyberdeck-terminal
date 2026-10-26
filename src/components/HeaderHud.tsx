@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, Tv, Radio, Sparkles, ChevronDown, Check, Palette, Type, Globe, Sun, Sliders, Monitor, Eye, Activity, Waves } from 'lucide-react';
+import { Terminal, Tv, Radio, Sparkles, ChevronDown, Check, Palette, Type, Globe, Sun, Sliders, Monitor, Eye, Activity, Waves, Ghost } from 'lucide-react';
 import {
   TerminalTheme,
   SessionState,
@@ -108,9 +108,9 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
   };
 
   // Dynamic CRT Display Values
-  const currentCurvature = crtConfig.curvature ? (crtConfig.curvatureIntensity ?? 50) : 0;
-  const currentBrightness = crtConfig.brightness ?? 115;
-  const currentVignette = crtConfig.vignetteIntensity ?? 70;
+  const currentCurvature = crtConfig.curvature ? (crtConfig.curvatureIntensity ?? 100) : 0;
+  const currentBrightness = crtConfig.brightness ?? 120;
+  const currentVignette = crtConfig.vignetteIntensity ?? 35;
 
   return (
     <header className="flex flex-wrap items-center justify-between border-b crt-glow-box pb-2 mb-2 gap-2 text-xs uppercase tracking-wider shrink-0 relative z-30">
@@ -908,13 +908,13 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
                       <div className="flex items-center justify-between text-[10px]">
                         <span className="text-zinc-400 font-bold">Transparência / Intensidade:</span>
                         <span className="text-cyan-300 font-mono font-bold">
-                          {crtConfig.hertzIntensity ?? 30}% ({(crtConfig.hertzIntensity ?? 30) <= 25 ? 'Ultra Suave' : (crtConfig.hertzIntensity ?? 30) <= 45 ? 'Suave' : 'Marcada'})
+                          {crtConfig.hertzIntensity ?? 5}% ({(crtConfig.hertzIntensity ?? 5) <= 10 ? 'Ultra Suave' : (crtConfig.hertzIntensity ?? 5) <= 30 ? 'Suave' : 'Marcada'})
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => {
-                            const nextVal = Math.max(0, (crtConfig.hertzIntensity ?? 30) - 5);
+                            const nextVal = Math.max(0, (crtConfig.hertzIntensity ?? 5) - 5);
                             onCrtConfigChange({ hertz: nextVal > 0, hertzIntensity: nextVal });
                           }}
                           title="Tornar faixas mais transparentes e suaves"
@@ -927,7 +927,7 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
                           min="0"
                           max="100"
                           step="5"
-                          value={crtConfig.hertzIntensity ?? 30}
+                          value={crtConfig.hertzIntensity ?? 5}
                           onChange={(e) =>
                             onCrtConfigChange({
                               hertz: true,
@@ -938,7 +938,7 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
                         />
                         <button
                           onClick={() => {
-                            const nextVal = Math.min(100, (crtConfig.hertzIntensity ?? 30) + 5);
+                            const nextVal = Math.min(100, (crtConfig.hertzIntensity ?? 5) + 5);
                             onCrtConfigChange({ hertz: true, hertzIntensity: nextVal });
                           }}
                           title="Aumentar intensidade das faixas"
@@ -951,8 +951,8 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
                       {/* Presets de Opacidade */}
                       <div className="grid grid-cols-4 gap-1 pt-0.5">
                         {[
-                          { label: 'Invisível (10%)', val: 10 },
-                          { label: 'Suave (25%)', val: 25 },
+                          { label: 'Ultra Suave (5%)', val: 5 },
+                          { label: 'Suave (15%)', val: 15 },
                           { label: 'Padrão (35%)', val: 35 },
                           { label: 'Marcada (60%)', val: 60 },
                         ].map((item) => (
@@ -960,7 +960,7 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
                             key={item.label}
                             onClick={() => onCrtConfigChange({ hertz: true, hertzIntensity: item.val })}
                             className={`py-0.5 px-1 rounded text-[9px] font-mono border text-center transition-all truncate ${
-                              (crtConfig.hertzIntensity ?? 30) === item.val && crtConfig.hertz
+                              (crtConfig.hertzIntensity ?? 5) === item.val && crtConfig.hertz
                                 ? 'border-cyan-400 bg-cyan-500/25 text-cyan-200 font-bold'
                                 : 'border-zinc-800 text-zinc-500 hover:text-zinc-300'
                             }`}
@@ -975,7 +975,7 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
                     <div className="grid grid-cols-5 gap-1 pt-0.5">
                       {[
                         { label: 'Off', hertz: false, speed: 0, width: 40, intensity: 0 },
-                        { label: 'Ultra Suave', hertz: true, speed: 30, width: 35, intensity: 20 },
+                        { label: 'Ultra Suave', hertz: true, speed: 15, width: 100, intensity: 5 },
                         { label: '50Hz Drift', hertz: true, speed: 25, width: 30, intensity: 25 },
                         { label: '60Hz CRT', hertz: true, speed: 45, width: 40, intensity: 30 },
                         { label: 'Interferência', hertz: true, speed: 70, width: 60, intensity: 45 },
@@ -1005,7 +1005,8 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
                   </div>
 
                   {/* Toggles */}
-                  <div className="space-y-2 pt-1 border-t border-zinc-900 text-zinc-300 text-[11px]">
+                  <div className="space-y-2.5 pt-1 border-t border-zinc-900 text-zinc-300 text-[11px]">
+                    {/* Grade de Fósforo */}
                     <label className="flex items-center justify-between cursor-pointer">
                       <span>Grade de Fósforo (Aperture Grille)</span>
                       <input
@@ -1015,6 +1016,63 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
                         className="accent-emerald-500 rounded cursor-pointer"
                       />
                     </label>
+
+                    {/* Phosphor Persistence (Ghosting) Toggle */}
+                    <div className="pt-2 border-t border-zinc-900/80 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-zinc-300">
+                          <Ghost
+                            className={`w-3.5 h-3.5 ${
+                              crtConfig.mode === 'real' && crtConfig.phosphorGhosting
+                                ? 'text-emerald-400 animate-pulse'
+                                : 'text-zinc-500'
+                            }`}
+                          />
+                          <span className="text-[10px] uppercase font-bold">Phosphor Persistence (Ghosting)</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-mono font-bold">
+                            {crtConfig.mode !== 'real' ? (
+                              <span className="text-zinc-600 text-[9px]">[INDISPONÍVEL]</span>
+                            ) : crtConfig.phosphorGhosting ? (
+                              <span className="text-emerald-400 text-[9px]">LIGADO (~450ms)</span>
+                            ) : (
+                              <span className="text-zinc-500 text-[9px]">OFF</span>
+                            )}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={crtConfig.mode !== 'real'}
+                            onClick={() => {
+                              if (crtConfig.mode === 'real') {
+                                onCrtConfigChange({ phosphorGhosting: !crtConfig.phosphorGhosting });
+                              }
+                            }}
+                            title={
+                              crtConfig.mode !== 'real'
+                                ? 'Efeito exclusivo do modo CRT Real. Ative o CRT Real para habilitar o Ghosting.'
+                                : crtConfig.phosphorGhosting
+                                ? 'Desligar efeito de persistência e ghosting de fósforo'
+                                : 'Ligar efeito de persistência e ghosting de fósforo'
+                            }
+                            className={`text-[9px] px-2 py-0.5 rounded border font-bold transition-all ${
+                              crtConfig.mode !== 'real'
+                                ? 'border-zinc-800/60 bg-zinc-950 text-zinc-600 cursor-not-allowed opacity-50'
+                                : crtConfig.phosphorGhosting
+                                ? 'border-emerald-400 bg-emerald-500/25 text-emerald-300 shadow-[0_0_8px_rgba(0,255,102,0.3)]'
+                                : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white hover:border-zinc-700'
+                            }`}
+                          >
+                            {crtConfig.mode !== 'real' ? 'BLOQUEADO' : crtConfig.phosphorGhosting ? 'LIGADO' : 'OFF'}
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[9px] text-zinc-500 leading-tight">
+                        {crtConfig.mode === 'real'
+                          ? 'Simula a dissipação analógica dos elétrons: caracteres antigos e apagados demoram ~450ms para sumir em afterglow suave.'
+                          : '⚠ Disponível apenas com o filtro CRT Real ativado. Nos modos Leve e Off, o efeito permanece desligado.'}
+                      </p>
+                    </div>
                   </div>
                 </>
               ) : (

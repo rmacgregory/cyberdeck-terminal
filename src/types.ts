@@ -59,6 +59,7 @@ export interface CrtConfig {
   hertzSpeed: number; // Velocidade das faixas (1 a 100)
   hertzWidth: number; // Largura / espessura das faixas (5 a 100)
   hertzIntensity?: number; // Intensidade / opacidade das faixas (0 a 100%, padrão suave ~30%)
+  phosphorGhosting?: boolean; // Efeito de Phosphor Persistence (Ghosting) no modo CRT Real
 }
 
 export interface SystemMetrics {

@@ -96,7 +96,7 @@ jobs:
             builder-args: --linux AppImage
           - os: macos-latest
             os-name: macOS (.dmg / .zip - Apple Silicon & Intel)
-            builder-args: --mac
+            builder-args: --mac --arm64 --x64
 
     steps:
       - name: Checkout do Repositório
@@ -141,6 +141,7 @@ jobs:
       - name: Limpar ferramentas de build nativas antes do empacotamento do Electron
         shell: bash
         run: |
+          rm -rf node_modules/@rolldown node_modules/vite node_modules/@tailwindcss node_modules/.vite
           node -e "try { require('fs').rmSync('node_modules/@rolldown', { recursive: true, force: true }); } catch (e) {}"
 
       - name: Limpar atributos estendidos (macOS)
@@ -217,7 +218,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p release-android
-          find android/app/build/outputs/apk/debug/ -type f -name "*.apk" -exec cp {} release-android/Cyberdeck-CRT-Terminal-${{ needs.prepare.outputs.version }}.apk \;
+          find android/app/build/outputs/apk/debug/ -type f -name "*.apk" -exec cp {} release-android/Cyberdeck-CRT-Terminal-${{ needs.prepare.outputs.version }}-android.apk \;
           echo "=== APK gerado com a versão ==="
           ls -lh release-android/
 

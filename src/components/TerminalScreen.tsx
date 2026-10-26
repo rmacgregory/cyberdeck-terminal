@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { TerminalLine, CrtConfig, TypographyConfig } from '../types';
 
 interface TerminalScreenProps {
@@ -28,6 +28,59 @@ export const TerminalScreen: React.FC<TerminalScreenProps> = ({
 }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Phosphor Persistence (Ghosting) active check: ONLY active if mode === 'real' and phosphorGhosting is true
+  const isGhostingActive = crtConfig.mode === 'real' && Boolean(crtConfig.phosphorGhosting);
+
+  // 1. Ghosting for input (typed and backspaced / modified characters)
+  const [ghostInput, setGhostInput] = useState<string>('');
+  const [ghostKey, setGhostKey] = useState<number>(0);
+  const prevInputRef = useRef<string>(inputValue);
+  const ghostInputTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!isGhostingActive) {
+      setGhostInput('');
+      prevInputRef.current = inputValue;
+      return;
+    }
+
+    if (prevInputRef.current && prevInputRef.current !== inputValue) {
+      // If characters were erased or changed, display the lingering phosphor ghost
+      setGhostInput(prevInputRef.current);
+      setGhostKey((k: number) => k + 1);
+
+      if (ghostInputTimerRef.current) clearTimeout(ghostInputTimerRef.current);
+      ghostInputTimerRef.current = setTimeout(() => {
+        setGhostInput('');
+      }, 450);
+    }
+    prevInputRef.current = inputValue;
+  }, [inputValue, isGhostingActive]);
+
+  // 2. Ghosting for cleared terminal lines (e.g. after 'clear' or 'cls')
+  const [ghostClearedLines, setGhostClearedLines] = useState<TerminalLine[]>([]);
+  const prevLinesRef = useRef<TerminalLine[]>(lines);
+  const ghostLinesTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!isGhostingActive) {
+      setGhostClearedLines([]);
+      prevLinesRef.current = lines;
+      return;
+    }
+
+    // Detect if lines were cleared (previous had content, new is empty or reset to 1 line)
+    if (prevLinesRef.current.length > 2 && lines.length <= 1) {
+      setGhostClearedLines(prevLinesRef.current);
+      if (ghostLinesTimerRef.current) clearTimeout(ghostLinesTimerRef.current);
+      ghostLinesTimerRef.current = setTimeout(() => {
+        setGhostClearedLines([]);
+      }, 550);
+    }
+
+    prevLinesRef.current = lines;
+  }, [lines, isGhostingActive]);
 
   // Auto-scroll downwards whenever output lines or input change
   const scrollToBottom = () => {
@@ -119,8 +172,24 @@ export const TerminalScreen: React.FC<TerminalScreenProps> = ({
       {/* Terminal Viewport: Content streams line-by-line downwards */}
       <div
         ref={viewportRef}
-        className={`flex-1 overflow-y-auto space-y-1 ${typoClasses} pr-2 cyber-scrollbar relative z-10 transition-all`}
+        className={`flex-1 overflow-y-auto space-y-1 ${typoClasses} pr-2 cyber-scrollbar relative z-10 transition-all ${
+          isGhostingActive ? 'crt-phosphor-persistence' : ''
+        }`}
       >
+        {/* Ghost Overlay for Cleared Terminal Lines */}
+        {isGhostingActive && ghostClearedLines.length > 0 && (
+          <div className="crt-ghost-cleared-overlay space-y-1" aria-hidden="true">
+            {ghostClearedLines.map((line: TerminalLine) => (
+              <div
+                key={`ghost-${line.id}`}
+                className={`${getLineClassName(line.type)} break-words whitespace-pre-wrap select-none opacity-40`}
+              >
+                {line.isHtml ? <span dangerouslySetInnerHTML={{ __html: line.text }} /> : line.text}
+              </div>
+            ))}
+          </div>
+        )}
+
         {lines.map((line) => (
           <div
             key={line.id}
@@ -142,14 +211,25 @@ export const TerminalScreen: React.FC<TerminalScreenProps> = ({
             {promptPrefix}
           </span>
           <div className="relative inline-flex items-center flex-1 min-w-[80px]">
+            {/* Phosphor Ghosting Afterglow Trail for Erased / Changed Characters */}
+            {isGhostingActive && ghostInput && ghostInput !== inputValue && (
+              <span
+                key={`ghost-in-${ghostKey}`}
+                className="crt-phosphor-ghost-trail whitespace-pre-wrap font-bold tracking-wide break-all"
+                aria-hidden="true"
+              >
+                {isPassword ? '•'.repeat(ghostInput.length) : ghostInput}
+              </span>
+            )}
+
             {/* Display typed text */}
             <span
-              className={`whitespace-pre-wrap font-bold text-white tracking-wide break-all ${getBloomClass()}`}
+              className={`whitespace-pre-wrap font-bold text-white tracking-wide break-all relative z-10 ${getBloomClass()}`}
             >
               {isPassword ? '•'.repeat(inputValue.length) : inputValue}
             </span>
             {/* Blinking block terminal cursor */}
-            <span className="term-cursor ml-0.5 shrink-0" />
+            <span className="term-cursor ml-0.5 shrink-0 relative z-10" />
 
             {/* Input capture */}
             <input
@@ -158,7 +238,7 @@ export const TerminalScreen: React.FC<TerminalScreenProps> = ({
               value={inputValue}
               onChange={(e) => onInputChange(e.target.value)}
               onKeyDown={onKeyDown}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-text z-10 text-transparent bg-transparent"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-text z-20 text-transparent bg-transparent"
               autoFocus
               autoCapitalize="off"
               autoComplete="off"

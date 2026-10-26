@@ -44,22 +44,23 @@ export default function App() {
   const [crtConfig, setCrtConfig] = useState<CrtConfig>(() => {
     let initialConfig: CrtConfig = {
       mode: 'off',
-      bloom: 'extreme',
+      bloom: 'normal',
       curvature: true,
-      curvatureIntensity: 50,
-      brightness: 115,
-      vignetteIntensity: 70,
-      cursorBlinkRate: 0.9,
-      scanlines: true,
+      curvatureIntensity: 100,
+      brightness: 120,
+      vignetteIntensity: 35,
+      cursorBlinkRate: 1.4,
+      scanlines: false,
       jitter: false,
-      jitterIntensity: 30,
+      jitterIntensity: 0,
       hertz: true,
-      hertzSpeed: 45,
-      hertzWidth: 40,
-      hertzIntensity: 30,
+      hertzSpeed: 15,
+      hertzWidth: 100,
+      hertzIntensity: 5,
+      phosphorGhosting: true,
     };
     try {
-      const saved = localStorage.getItem('CYBERDECK_CRT_CONFIG');
+      const saved = localStorage.getItem('CYBERDECK_CRT_CONFIG_V4');
       if (saved) {
         const parsed = JSON.parse(saved);
         delete parsed.bezel;
@@ -550,29 +551,29 @@ export default function App() {
 
   // Sincroniza dinamicamente as variáveis CSS de Brilho e Curvatura do Tubo CRT
   useEffect(() => {
-    const brightnessVal = (crtConfig.brightness ?? 115) / 100;
-    const curveIntensity = crtConfig.curvature ? (crtConfig.curvatureIntensity ?? 50) : 0;
+    const brightnessVal = (crtConfig.brightness ?? 120) / 100;
+    const curveIntensity = crtConfig.curvature ? (crtConfig.curvatureIntensity ?? 100) : 0;
 
     // Curvatura: 0% = plano (sem distorção); 50% = clássico retro; 100% = tubo esférico extremo
     const perspective = curveIntensity === 0 ? 99999 : Math.round(2000 - (curveIntensity / 100) * 1550);
     const scale = (1 - (curveIntensity / 100) * 0.032).toFixed(3);
     const radius = Math.round(4 + (curveIntensity / 100) * 36);
 
-    const vignetteVal = (crtConfig.vignetteIntensity ?? 70) / 100;
+    const vignetteVal = (crtConfig.vignetteIntensity ?? 35) / 100;
 
     // Taxa de piscada do cursor: 0 = estático (solid / animation: none); > 0 = animado
     if (crtConfig.cursorBlinkRate === 0) {
       document.documentElement.style.setProperty('--term-cursor-animation', 'none');
       document.documentElement.style.setProperty('--term-cursor-blink-rate', '0s');
     } else {
-      const rate = crtConfig.cursorBlinkRate ?? 0.9;
+      const rate = crtConfig.cursorBlinkRate ?? 1.4;
       document.documentElement.style.setProperty('--term-cursor-animation', `cursor-blink ${rate}s infinite`);
       document.documentElement.style.setProperty('--term-cursor-blink-rate', `${rate}s`);
     }
 
     // Nível de Tremor / Jitter do canhão de elétrons CRT
     const isJitterActive = crtConfig.jitter && (crtConfig.jitterIntensity ?? 0) > 0;
-    const jitterIntensity = isJitterActive ? (crtConfig.jitterIntensity ?? 30) : 0;
+    const jitterIntensity = isJitterActive ? (crtConfig.jitterIntensity ?? 0) : 0;
     const jitterMaxPx = ((jitterIntensity / 100) * 3.5).toFixed(2);
     const jitterDuration = Math.max(0.04, Number((0.15 - (jitterIntensity / 100) * 0.1).toFixed(3)));
 
@@ -589,9 +590,9 @@ export default function App() {
 
     // Faixas de Hertz e Varredura Analógica (Roll Bars / 50Hz-60Hz)
     const isHertzActive = crtConfig.hertz && (crtConfig.hertzSpeed ?? 0) > 0;
-    const hertzSpeed = isHertzActive ? (crtConfig.hertzSpeed ?? 45) : 0;
-    const hertzWidth = crtConfig.hertzWidth ?? 40;
-    const hertzIntensity = crtConfig.hertzIntensity ?? 30;
+    const hertzSpeed = isHertzActive ? (crtConfig.hertzSpeed ?? 15) : 0;
+    const hertzWidth = crtConfig.hertzWidth ?? 100;
+    const hertzIntensity = crtConfig.hertzIntensity ?? 5;
     const hertzDuration = Math.max(0.45, Number((15 * Math.pow(0.04, hertzSpeed / 100)).toFixed(2)));
     const hertzHeightPx = Math.round(25 + (hertzWidth / 100) * 395);
     const hertzSecondaryDelay = -(hertzDuration / 2).toFixed(2);
@@ -651,6 +652,7 @@ export default function App() {
     setCrtConfig((prev) => {
       const updated = { ...prev, ...newVals };
       try {
+        localStorage.setItem('CYBERDECK_CRT_CONFIG_V4', JSON.stringify(updated));
         localStorage.setItem('CYBERDECK_CRT_CONFIG', JSON.stringify(updated));
       } catch {
         // Ignore
@@ -1074,11 +1076,20 @@ export default function App() {
       } else if (sub === 'curve' || sub === 'curva') {
         updateCrtConfig({ curvature: !crtConfig.curvature });
         appendLine(`[*] Curvatura esférica do tubo: ${!crtConfig.curvature ? 'LIGADA' : 'DESLIGADA'}`, 'info');
+      } else if (sub === 'ghost' || sub === 'ghosting' || sub === 'phosphor' || sub === 'persistencia') {
+        if (crtConfig.mode !== 'real') {
+          appendLine('[AVISO] O efeito de Phosphor Persistence (Ghosting) só funciona quando o CRT Real está ativado.', 'warning');
+          appendLine('Use o comando \'crt real\' para ligar o modo de tubo antes de ativar o ghosting.', 'dim');
+          return;
+        }
+        const nextGhost = !crtConfig.phosphorGhosting;
+        updateCrtConfig({ phosphorGhosting: nextGhost });
+        appendLine(`[*] Phosphor Persistence (Ghosting): ${nextGhost ? 'ATIVADO (~450ms)' : 'DESLIGADO'}`, nextGhost ? 'success' : 'info');
       } else {
         const nextMode = crtConfig.mode === 'real' ? 'subtle' : crtConfig.mode === 'subtle' ? 'off' : 'real';
         updateCrtConfig({ mode: nextMode });
         appendLine(`[*] Modo CRT alternado para: ${nextMode.toUpperCase()}`, 'info');
-        appendLine('Comandos: crt real | crt leve | crt off | crt bloom | crt curva', 'dim');
+        appendLine('Comandos: crt real | crt leve | crt off | crt bloom | crt curva | crt ghost', 'dim');
       }
       return;
     }
@@ -1380,6 +1391,31 @@ export default function App() {
       }
 
       appendLine('Comando não reconhecido. Digite "hertz" para instruções.', 'warning');
+      return;
+    }
+
+    if (cmd === 'ghost' || cmd === 'ghosting' || cmd === 'phosphor' || cmd === 'persistencia') {
+      if (crtConfig.mode !== 'real') {
+        appendLine('[AVISO] O efeito de Phosphor Persistence (Ghosting) só funciona quando o CRT Real está ativado.', 'warning');
+        appendLine('Use o comando \'crt real\' para ligar o modo de tubo antes de ativar o ghosting.', 'dim');
+        return;
+      }
+      const sub = args[0]?.toLowerCase();
+      if (sub === 'off' || sub === 'desligar' || sub === '0') {
+        updateCrtConfig({ phosphorGhosting: false });
+        appendLine('[*] Phosphor Persistence (Ghosting): DESLIGADO', 'info');
+      } else if (sub === 'on' || sub === 'ligar' || sub === '1') {
+        updateCrtConfig({ phosphorGhosting: true });
+        appendLine('[*] Phosphor Persistence (Ghosting): ATIVADO (Decaimento analógico ~450ms)', 'success');
+      } else {
+        const nextGhost = !crtConfig.phosphorGhosting;
+        updateCrtConfig({ phosphorGhosting: nextGhost });
+        appendLine(
+          `[*] Phosphor Persistence (Ghosting): ${nextGhost ? 'ATIVADO (~450ms)' : 'DESLIGADO'}`,
+          nextGhost ? 'success' : 'info'
+        );
+        appendLine('Uso: ghost <on | off>', 'dim');
+      }
       return;
     }
 
@@ -1829,6 +1865,7 @@ export default function App() {
     appendLine(`• vinheta <0-100|off>      : Ajusta a intensidade do escurecimento de bordas.`, 'stdout');
     appendLine(`• jitter <0-100|off>       : Controla o nível de tremor/instabilidade da imagem CRT.`, 'stdout');
     appendLine(`• hertz <vel> [largura]    : Controla as faixas de varredura Hertz (50Hz/60Hz roll bar).`, 'stdout');
+    appendLine(`• ghost [on|off]           : Ativa/desativa Phosphor Persistence (Ghosting) no modo CRT Real.`, 'stdout');
     appendLine(`• theme [green|amber|cyan] : Altera paleta de fósforo da tela CRT.`, 'stdout');
     appendLine(`• crt [real|leve|bloom|off]: Modos do tubo catódico, curvatura e brilho de fósforo.`, 'stdout');
     appendLine(`• font [family|size|space] : Tipografia CRT: 4 fontes, 3 tamanhos e espaçamentos.`, 'stdout');

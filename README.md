@@ -27,14 +27,30 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
 * **Gerenciamento Fácil**: Abra abas pelo botão `+ Nova Aba`, atalhos de teclado ou diretamente pelos comandos `tab new`, `tab close` e painel de Acessos Rápidos.
 
 ### 🖥️ 2. Simulação CRT Avançada, Brilho, Curvatura, Jitter & Faixas de Hertz
-* **Padrão de Inicialização CRT OFF**: O terminal agora inicializa por padrão no modo **CRT OFF** (exibição moderna, plana e de alta nitidez), permitindo alternar instantaneamente para **CRT REAL** ou **CRT LEVE** pelo botão de topo ou comandos de terminal quando desejar a experiência retrô.
+* **Configurações Padrão Oficiais do Terminal**:
+  * **Modo de Inicialização**: **CRT OFF** (abre em modo moderno, plano e de alto desempenho; ao ativar o filtro CRT, as seguintes configurações padrão calibradas são aplicadas instantaneamente).
+  * **Brilho da Tela CRT**: **120%** (luminosidade reforçada para vivacidade óptica perfeita).
+  * **Curvatura do Tubo CRT**: **Extremo (100%)** (máxima imersão física esférica de tubo catódico vintage).
+  * **Intensidade da Vinheta**: **Suave (35%)** (escurecimento periférico suave que não esconde texto nos cantos).
+  * **Brilho do Fósforo (Bloom)**: **Normal** (efeito de fósforo equilibrado para longa leitura sem cansar a visão).
+  * **Tremor do Tubo (Jitter)**: **Desligado (0%)** (estabilidade sólida do feixe de elétrons por padrão).
+  * **Blink Rate do Cursor**: **Lento 15% (1.40s)** (cadência de piscada lenta, elegante e não intrusiva).
+  * **Faixas de Hertz (Varredura Analógica)**: **Ligado** com **Velocidade 15%**, **Largura das Faixas 100%** e **Transparência 5% Ultra Suave** (varredura contínua ampla, quase transparente e relaxante).
+  * **Grade de Fósforo (Scanlines & Aperture Grille)**: **Desativada por padrão** (nitidez e leitura cristalina).
+  * **Phosphor Persistence (Ghosting / Persistência do Fósforo)**: **Ativado no modo CRT Real** (decaimento analógico de ~450ms nos caracteres).
+* **Phosphor Persistence (Ghosting Analógico do Fósforo)**: Simulação física da lenta dissipação luminosa dos elétrons em tubos CRT reais (fósforos P1 Green e P3 Amber):
+  * **Decaimento Suave de Caracteres**: Caracteres apagados, alterados ou removidos via backspace persistem por ~450 milissegundos em silhueta de afterglow antes de sumir completamente.
+  * **Decaimento ao Limpar a Tela (`clear` / `cls`)**: O conteúdo anterior decai suavemente na tela em 550ms em vez de cortar bruscamente a zero.
+  * **Botão Liga/Desliga no HUD**: Botão dedicado dentro do menu de configurações de tela CRT para ligar e desligar a qualquer momento.
+  * **Exclusividade do Modo CRT Real**: Este efeito funciona **estritamente quando o filtro CRT Real está ativado**. Nos modos **CRT Leve** e **CRT Off**, o efeito fica automaticamente desligado e com o botão bloqueado (`[INDISPONÍVEL]`), garantindo máxima fidelidade aos diferentes modos visuais.
+  * **Comandos de Terminal**: `ghost on`, `ghost off`, `crt ghost`, `phosphor on/off`.
 * **Exibição Edge-to-Edge Limpa (Sem Moldura / Bezel)**: A antiga moldura industrial pesada de monitor foi removida, liberando 100% da área útil da janela em todos os modos, garantindo visual moderno e limpo sem obstruções visuais.
 * **Efeito das Faixas de Hertz (Varredura Analógica / Roll Bars Suaves & Quase Transparentes)**: Simulação refinada de interferência de frequência de rede (50Hz/60Hz AC hum e desincronização da taxa de varredura vertical) com passagem contínua de faixas luminosas ultra suaves e quase transparentes pela tela, preservando a legibilidade total do texto sem cansar a visão:
-  * **Transparência & Suavidade Calibradas**: Gradientes rebalanceados para serem quase transparentes (alfa ultra baixo de 2% a 7%), sem cortes pretos bruscos ou faixas agressivas.
-  * **Controle de Opacidade / Intensidade**: Ajustável de 0% (invisível) a 100% com slider e presets dedicados (*Invisível 10%*, *Suave 25%*, *Padrão 35%*, *Marcada 60%*).
-  * **Velocidade de Passagem**: De 1% (varredura ultra lenta e relaxante de 15s) a 100% (flutter rápido de 0.5s).
-  * **Largura das Faixas**: De 5% (linhas de feixe finas de 30px) a 100% (macrofaixas de interferência de 420px).
-  * **Presets Rápidos**: *Ultra Suave*, *50Hz Drift*, *60Hz CRT Clássico* e *Interferência AC*.
+  * **Transparência & Suavidade Calibradas**: Gradientes rebalanceados para serem quase transparentes (alfa ultra baixo de 2% a 5%), sem cortes pretos bruscos ou faixas agressivas.
+  * **Controle de Opacidade / Intensidade**: Ajustável de 0% (invisível) a 100% com slider e presets dedicados (*Ultra Suave 5%*, *Suave 15%*, *Padrão 35%*, *Marcada 60%*).
+  * **Velocidade de Passagem**: De 1% (varredura ultra lenta e relaxante de 15s) a 100% (flutter rápido de 0.5s). Padrão em 15%.
+  * **Largura das Faixas**: De 5% (linhas de feixe finas de 30px) a 100% (macrofaixas de interferência de 420px). Padrão em 100%.
+  * **Presets Rápidos**: *Ultra Suave (Padrão)*, *50Hz Drift*, *60Hz CRT Clássico* e *Interferência AC*.
   * Comandos de Terminal: `hertz <velocidade> [largura]`, `hertz opacity <0-100>`, `hertz speed <1-100>`, `hertz width <5-100>`, `hertz suave`, `hertz 60hz`, `hertz off/on`.
 * **Tremor da Imagem (Jitter do Tubo CRT)**: Animação CSS de instabilidade aleatória do canhão de elétrons ajustável de 0% (imagem estável) a 100% (caos vintage), configurável pelo HUD ou comando `jitter <0-100|off>`.
 * **Controle Dinâmico de Brilho**: Ajuste fino da luminosidade do monitor CRT de 70% a 200% via slider na interface ou comando `brightness <valor>`.
@@ -43,7 +59,7 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
 * **Taxa de Piscada do Cursor (Blink Rate)**: Controle no HUD com preview ao vivo, suportando modo fixo/estático (`solid`), lento, normal ou turbo (comando `cursor <solid|0.5s|turbo>`).
 * **Configurações Unificadas de Tela & Tipografia**: Fontes, tamanhos e espaçamento agora acessíveis diretamente dentro do menu de configurações CRT.
 * **Brilho de Fósforo & Bloom Intenso**: Efeito de irradiação de luz nos caracteres (`Extreme`, `Normal`, `Soft`).
-* **Linhas de Varredura (Scanlines & Aperture Grille)**: Efeito clássico de tubo de raios catódicos com subpixels RGB analógicos.
+* **Linhas de Varredura (Scanlines & Aperture Grille)**: Efeito clássico de tubo de raios catódicos com subpixels RGB analógicos (desativada por padrão para máxima nitidez).
 * **4 Temas de Cores de Fósforo**:
   * 🟢 **Matrix Green**: O lendário verde fósforo P1 (#00ff66).
   * 🟡 **Amber CRT**: Fósforo âmbar clássico de estações industriais (#ffb000).
@@ -87,14 +103,15 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
 
 Acesse a aba [**Releases**](https://github.com/rmacgregory/cyberdeck-terminal/releases) do repositório para baixar:
 
-| Sistema Operacional | Formato | Descrição |
-| :--- | :--- | :--- |
-| 🪟 **Windows** (64-bit) | `.exe` (Setup) | Instalador oficial 64-bit com atalhos |
-| 🪟 **Windows** (64-bit) | `.zip` (Portable) | **Portátil puro 64-bit nativo**: extraia e execute direto, sem instalação |
-| 🪟 **Windows** (64-bit) | `.exe` (Portable) | Executável único portátil |
-| 🐧 **Linux** (64-bit) | `.AppImage` | Portátil para Ubuntu, Debian, Fedora, Arch, etc. (`chmod +x` e rodar) |
-| 🍎 **macOS** (Apple Silicon & Intel) | `.dmg` / `.zip` | **Pacotes dedicados para Apple Silicon (M1/M2/M3/M4 - arm64) e Mac Intel (x64)** com assinatura Ad-Hoc |
-| 📱 **Android** (Tablet/Mobile) | `.apk` | Pacote nativo único para instalação direta no seu tablet Android |
+| Sistema Operacional | Formato | Nome do Arquivo no Release | Descrição |
+| :--- | :--- | :--- | :--- |
+| 🪟 **Windows** (64-bit) | `.exe` (Setup) | `Cyberdeck-CRT-Terminal-<versao>-windows-Setup.exe` | Instalador oficial 64-bit com atalhos |
+| 🪟 **Windows** (64-bit) | `.exe` (Portable) | `Cyberdeck-CRT-Terminal-<versao>-windows-Portable.exe` | Executável único portátil 64-bit |
+| 🪟 **Windows** (64-bit) | `.zip` (Portable) | `Cyberdeck-CRT-Terminal-<versao>-windows-x64.zip` | Compactado portátil 64-bit nativo |
+| 🐧 **Linux** (64-bit) | `.AppImage` | `Cyberdeck-CRT-Terminal-<versao>-linux.AppImage` | Portátil para Ubuntu, Debian, Fedora, Arch, etc. |
+| 🍎 **macOS** (Apple Silicon) | `.dmg` / `.zip` | `Cyberdeck-CRT-Terminal-<versao>-macos-arm64.dmg` / `.zip` | Pacote nativo dedicado para chips M1/M2/M3/M4 |
+| 🍎 **macOS** (Intel x64) | `.dmg` / `.zip` | `Cyberdeck-CRT-Terminal-<versao>-macos-x64.dmg` / `.zip` | Pacote nativo dedicado para processadores Intel Mac |
+| 📱 **Android** (Tablet/Mobile) | `.apk` | `Cyberdeck-CRT-Terminal-<versao>-android.apk` | Pacote nativo com tag explícita de plataforma Android |
 
 * 🍎 **Para usuários de Mac**: Consulte o [**Guia de Uso no macOS (COMO-RODAR-NO-MAC.md)**](./COMO-RODAR-NO-MAC.md) para saber como liberar o app no Gatekeeper caso o macOS exiba o aviso padrão de "desenvolvedor não identificado" ou "app danificado".
 * 📱 **Para usuários de Android**: Consulte o [**Guia de Uso no Android (COMO-RODAR-NO-ANDROID.md)**](./COMO-RODAR-NO-ANDROID.md) para detalhes completos de instalação no tablet e compilação do APK.
@@ -148,6 +165,7 @@ Digite os comandos abaixo diretamente no prompt do Cyberdeck:
 | `vinheta <0-100\|off>` | Ajusta a vinheta óptica analógica de escurecimento periférico |
 | `jitter <0-100\|off>` | Ajusta a intensidade do tremor/instabilidade analógica do tubo CRT |
 | `hertz <vel> [largura]` | Controla faixas de varredura Hertz (velocidade 1-100, largura 5-100, off/on) |
+| `ghost <on\|off>` | Ativa/desativa o efeito de Phosphor Persistence (Ghosting) no modo CRT Real |
 | `cursor <solid\|0.5s\|slow\|fast>` | Ajusta a taxa de piscada (blink rate) do cursor do terminal |
 | `font <família\|sm\|md\|lg\|normal\|compacto>` | Ajusta a tipografia e o espaçamento de linhas |
 | `browser <url>` | Abre o navegador web Cyber-Net na URL informada *(Alpha)* |
