@@ -33,28 +33,52 @@ jobs:
       - name: Checkout do Repositório
         uses: actions/checkout@v4
 
-      - name: Calcular Versão Exata
+      - name: Calcular Versão Exata (SemVer Válido)
         id: get_version
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag_name }}" ]; then
-            RAW_TAG="${{ github.event.inputs.tag_name }}"
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            RAW_TAG="${{ github.ref_name }}"
-          else
-            # Versão base do package.json combinada com o número de execução
-            BASE_VER=$(node -p "require('./package.json').version")
-            RAW_TAG="v${BASE_VER}.${{ github.run_number }}"
-          fi
+          node -e "
+            let rawTag = '';
+            const eventName = '${{ github.event_name }}';
+            const inputTag = '${{ github.event.inputs.tag_name }}';
+            const gitRef = '${{ github.ref }}';
+            const refName = '${{ github.ref_name }}';
+            const runNum = '${{ github.run_number }}' || '1';
 
-          # Versão limpa (sem 'v') para package.json e nomes de binários
-          CLEAN_VER="${RAW_TAG#v}"
-          FINAL_TAG="v${CLEAN_VER}"
+            if (eventName === 'workflow_dispatch' && inputTag) {
+              rawTag = inputTag;
+            } else if (gitRef.startsWith('refs/tags/')) {
+              rawTag = refName;
+            } else {
+              // Push no branch (sem tag): extrai major e minor do package.json e usa github.run_number como patch
+              const pkg = require('./package.json');
+              const base = (pkg.version || '1.0.0').replace(/^v/, '');
+              const parts = base.split('.');
+              const major = parts[0] || '1';
+              const minor = parts[1] || '0';
+              rawTag = \`v\${major}.\${minor}.\${runNum}\`;
+            }
 
-          echo "version=${CLEAN_VER}" >> $GITHUB_OUTPUT
-          echo "tag=${FINAL_TAG}" >> $GITHUB_OUTPUT
-          echo "build_number=${{ github.run_number }}" >> $GITHUB_OUTPUT
-          echo "=== Versão calculada: ${CLEAN_VER} | Tag: ${FINAL_TAG} | Build #${{ github.run_number }} ==="
+            // Normaliza para formato SemVer estrito (X.Y.Z) exigido por electron-builder
+            let clean = rawTag.replace(/^v/, '').trim();
+            const segs = clean.split('.');
+            if (segs.length > 3) {
+              // Se vierem 4 partes como 1.0.0.10, condensa para 1.0.10
+              clean = \`\${segs[0]}.\${segs[1]}.\${segs[segs.length - 1]}\`;
+            } else if (segs.length === 2) {
+              clean = \`\${segs[0]}.\${segs[1]}.0\`;
+            } else if (segs.length === 1) {
+              clean = \`\${segs[0]}.0.0\`;
+            }
+
+            const finalTag = 'v' + clean;
+            const fs = require('fs');
+            const outputFile = process.env.GITHUB_OUTPUT;
+            fs.appendFileSync(outputFile, \`version=\${clean}\n\`);
+            fs.appendFileSync(outputFile, \`tag=\${finalTag}\n\`);
+            fs.appendFileSync(outputFile, \`build_number=\${runNum}\n\`);
+            console.log(\`=== Versão SemVer calculada: \${clean} | Tag: \${finalTag} | Build #\${runNum} ===\`);
+          "
 
   build:
     name: Build para ${{ matrix.os-name }}
@@ -85,14 +109,7 @@ jobs:
 
       - name: Sincronizar Versão nos Arquivos do Projeto
         shell: bash
-        run: |
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.version = '${{ needs.prepare.outputs.version }}';
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n', 'utf8');
-            console.log('Versão atualizada no package.json para: ' + pkg.version);
-          "
+        run: node scripts/set-version.js "${{ needs.prepare.outputs.version }}"
 
       - name: Instalar Dependências
         shell: bash
@@ -112,6 +129,12 @@ jobs:
             npm install --no-save @rolldown/binding-linux-x64-gnu@1.2.15 || true
           fi
 
+      - name: Instalar Dependências de Sistema para Empacotamento (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update || true
+          sudo apt-get install -y libfuse2t64 libfuse2 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libgtk-3-0 libasound2t64 libasound2 || true
+
       - name: Compilar Frontend (Vite)
         run: npm run build
 
@@ -122,6 +145,7 @@ jobs:
       - name: Compilar Aplicativo Desktop (${{ matrix.os-name }})
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          APPIMAGE_EXTRACT_AND_RUN: 1
           DEBUG: electron-builder
         run: npx electron-builder ${{ matrix.builder-args }} --publish never
 
@@ -157,14 +181,7 @@ jobs:
 
       - name: Sincronizar Versão nos Arquivos do Projeto
         shell: bash
-        run: |
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.version = '${{ needs.prepare.outputs.version }}';
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n', 'utf8');
-            console.log('Versão atualizada no package.json para: ' + pkg.version);
-          "
+        run: node scripts/set-version.js "${{ needs.prepare.outputs.version }}"
 
       - name: Instalar Dependências
         shell: bash

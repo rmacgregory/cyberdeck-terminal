@@ -28,8 +28,17 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_21
-        targetCompatibility JavaVersion.VERSION_21
+        sourceCompatibility rootProject.ext.has('javaVersion') ? rootProject.ext.javaVersion : JavaVersion.VERSION_21
+        targetCompatibility rootProject.ext.has('javaVersion') ? rootProject.ext.javaVersion : JavaVersion.VERSION_21
+    }
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
+}
+
+plugins.withId("kotlin-android") {
+    kotlin {
+        jvmToolchain(21)
     }
 }
 

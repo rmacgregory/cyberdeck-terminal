@@ -162,8 +162,8 @@ Digite os comandos abaixo diretamente no prompt do Cyberdeck:
 * **Gráficos CRT**: Filtros SVG/CSS customizados de tubo catódico, brilho, curvatura 3D e vinheta óptica ajustável.
 * **Backend de Terminal**: Node.js, [WebSocket (`ws`)](https://github.com/websockets/ws), [SSH2](https://github.com/mscdex/ssh2), Net Sockets nativos e Child Process (`spawn`).
 * **Desktop Runtime**: [Electron](https://www.electronjs.org/) + [Electron Builder](https://www.electron.build/).
-* **Mobile Runtime**: [Capacitor](https://capacitorjs.com/) para Android nativo.
-* **CI/CD**: GitHub Actions com matriz de compilação cruzada para Windows, Linux, macOS e Android com publicação automática de Releases.
+* **Mobile Runtime**: [Capacitor](https://capacitorjs.com/) para Android nativo (SDK 36, Java 21 / Temurin, Gradle 8.14+).
+* **CI/CD & Cross-Compilação Multiplataforma**: GitHub Actions com matriz de compilação cruzada para Windows (x64), Linux (`.AppImage` com compatibilidade `libfuse2/t64`), macOS (`.dmg` e `.zip` Universal) e Android (`.apk` com pipeline unificado em `JavaVersion.VERSION_21` e encoding UTF-8 em todos os módulos Gradle), com versionamento estrito SemVer (`MAJOR.MINOR.PATCH`) e publicação automática de Releases.
 
 ---
 

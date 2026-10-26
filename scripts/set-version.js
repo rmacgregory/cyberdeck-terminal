@@ -14,9 +14,20 @@ if (!rawVersion) {
 }
 
 // Remove prefixo 'v' se houver
-const version = rawVersion.replace(/^v/, '').trim();
+let version = rawVersion.replace(/^v/, '').trim();
 
-console.log(`\nSincronizando versão [${version}] em todos os arquivos de build...`);
+// Garante formato SemVer válido de 3 componentes (MAJOR.MINOR.PATCH) exigido pelo electron-builder
+const parts = version.split('.');
+if (parts.length > 3) {
+  // Se vierem 4 partes como 1.0.0.10, condensa para 1.0.10
+  version = `${parts[0]}.${parts[1]}.${parts[parts.length - 1]}`;
+} else if (parts.length === 2) {
+  version = `${parts[0]}.${parts[1]}.0`;
+} else if (parts.length === 1) {
+  version = `${parts[0]}.0.0`;
+}
+
+console.log(`\nSincronizando versão SemVer [${version}] em todos os arquivos de build...`);
 
 // 1. Atualizar package.json
 const pkgPath = path.join(rootDir, 'package.json');

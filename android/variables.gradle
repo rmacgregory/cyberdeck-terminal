@@ -1,4 +1,5 @@
 ext {
+    javaVersion = JavaVersion.VERSION_21
     minSdkVersion = 24
     compileSdkVersion = 36
     targetSdkVersion = 36
