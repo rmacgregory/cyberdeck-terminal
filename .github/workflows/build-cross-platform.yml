@@ -96,7 +96,7 @@ jobs:
             builder-args: --linux AppImage
           - os: macos-latest
             os-name: macOS (.dmg / .zip - Apple Silicon & Intel)
-            builder-args: --mac --arm64 --x64
+            builder-args: --mac
 
     steps:
       - name: Checkout do Repositório
@@ -141,7 +141,7 @@ jobs:
       - name: Limpar ferramentas de build nativas antes do empacotamento do Electron
         shell: bash
         run: |
-          rm -rf node_modules/@rolldown || true
+          node -e "try { require('fs').rmSync('node_modules/@rolldown', { recursive: true, force: true }); } catch (e) {}"
 
       - name: Limpar atributos estendidos (macOS)
         if: runner.os == 'macOS'
