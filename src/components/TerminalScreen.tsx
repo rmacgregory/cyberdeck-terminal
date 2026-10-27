@@ -12,6 +12,8 @@ interface TerminalScreenProps {
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   crtConfig: CrtConfig;
   typographyConfig: TypographyConfig;
+  isActive?: boolean;
+  onFocusPane?: () => void;
 }
 
 export const TerminalScreen: React.FC<TerminalScreenProps> = ({
@@ -25,9 +27,18 @@ export const TerminalScreen: React.FC<TerminalScreenProps> = ({
   onKeyDown,
   crtConfig,
   typographyConfig,
+  isActive = true,
+  onFocusPane,
 }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Focus input automatically whenever this pane becomes active
+  useEffect(() => {
+    if (isActive) {
+      inputRef.current?.focus();
+    }
+  }, [isActive]);
 
   // Phosphor Persistence (Ghosting) active check: ONLY active if mode === 'real' and phosphorGhosting is true
   const isGhostingActive = crtConfig.mode === 'real' && Boolean(crtConfig.phosphorGhosting);
@@ -95,6 +106,9 @@ export const TerminalScreen: React.FC<TerminalScreenProps> = ({
 
   // Clicking anywhere in the terminal container focuses the typing cursor
   const handleContainerClick = () => {
+    if (onFocusPane) {
+      onFocusPane();
+    }
     inputRef.current?.focus();
   };
 
@@ -167,8 +181,22 @@ export const TerminalScreen: React.FC<TerminalScreenProps> = ({
   return (
     <main
       onClick={handleContainerClick}
-      className={`flex-1 flex flex-col min-h-0 relative cursor-text select-text border crt-glow-box p-3 sm:p-4 bg-black/45 rounded backdrop-blur-[2px] ${getFontFamilyClass()}`}
+      className={`flex-1 flex flex-col min-h-0 relative select-text border crt-glow-box p-3 sm:p-4 bg-black/45 rounded backdrop-blur-[2px] transition-all duration-200 ${getFontFamilyClass()} ${
+        isActive
+          ? 'cursor-text ring-1 ring-emerald-500/20'
+          : 'cursor-pointer opacity-70 hover:opacity-90 border-zinc-800'
+      }`}
     >
+      {/* Visual Inactive Indicator inside terminal screen */}
+      {!isActive && (
+        <div className="absolute top-2 right-3 z-30 pointer-events-none select-none">
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono tracking-wider bg-zinc-900/90 text-zinc-400 border border-zinc-700/60 backdrop-blur-sm shadow flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+            CLIQUE PARA DIGITAR AQUI
+          </span>
+        </div>
+      )}
+
       {/* Terminal Viewport: Content streams line-by-line downwards */}
       <div
         ref={viewportRef}
@@ -228,18 +256,37 @@ export const TerminalScreen: React.FC<TerminalScreenProps> = ({
             >
               {isPassword ? '•'.repeat(inputValue.length) : inputValue}
             </span>
-            {/* Blinking block terminal cursor */}
-            <span className="term-cursor ml-0.5 shrink-0 relative z-10" />
+            {/* Blinking block terminal cursor when active, static outline when inactive */}
+            {isActive ? (
+              <span className="term-cursor ml-0.5 shrink-0 relative z-10" />
+            ) : (
+              <span className="w-2 h-4 border border-zinc-500/70 inline-block ml-0.5 shrink-0 relative z-10 opacity-40" />
+            )}
 
             {/* Input capture */}
             <input
               ref={inputRef}
               type={isPassword ? 'password' : 'text'}
               value={inputValue}
-              onChange={(e) => onInputChange(e.target.value)}
-              onKeyDown={onKeyDown}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-text z-20 text-transparent bg-transparent"
-              autoFocus
+              readOnly={!isActive}
+              tabIndex={isActive ? 0 : -1}
+              onChange={(e) => {
+                if (!isActive) return;
+                onInputChange(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (!isActive) return;
+                onKeyDown(e);
+              }}
+              onFocus={() => {
+                if (!isActive && onFocusPane) {
+                  onFocusPane();
+                }
+              }}
+              className={`absolute inset-0 w-full h-full opacity-0 z-20 text-transparent bg-transparent ${
+                isActive ? 'cursor-text' : 'cursor-pointer'
+              }`}
+              autoFocus={isActive}
               autoCapitalize="off"
               autoComplete="off"
               spellCheck="false"

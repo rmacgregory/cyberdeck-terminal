@@ -194,7 +194,8 @@ export default function App() {
 
   // SPLIT-SCREEN STATE
   const [isSplitScreen, setIsSplitScreen] = useState<boolean>(false);
-  const [secondaryTabId, setSecondaryTabId] = useState<string | null>(null);
+  const [splitLeftTabId, setSplitLeftTabId] = useState<string>('tab-1');
+  const [splitRightTabId, setSplitRightTabId] = useState<string | null>(null);
 
   // DEGAUSS (Desmagnetização da Bobina CRT) STATE
   const [isDegaussing, setIsDegaussing] = useState<boolean>(false);
@@ -212,14 +213,20 @@ export default function App() {
     setIsSplitScreen((prev) => {
       const next = !prev;
       if (next) {
-        const other = tabs.find((t) => t.id !== activeTabId);
+        // Left pane will take active tab
+        const leftId = activeTabId;
+        setSplitLeftTabId(leftId);
+
+        // Right pane takes another existing tab or creates a fresh one
+        const other = tabs.find((t) => t.id !== leftId);
         if (other) {
-          setSecondaryTabId(other.id);
+          setSplitRightTabId(other.id);
         } else {
           const newId = `tab-${Date.now()}`;
           const newTab = createNewTab(newId, `Console ${tabs.length + 1} - Split`, 'LOCAL');
           setTabs((curr) => [...curr, newTab]);
-          setSecondaryTabId(newId);
+          setSplitRightTabId(newId);
+          connectTabSocket(newId, backendUrl);
         }
       }
       return next;
@@ -233,8 +240,12 @@ export default function App() {
   tabsRef.current = tabs;
 
   const currentTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
-  const secondaryTab = isSplitScreen
-    ? tabs.find((t) => t.id === secondaryTabId) || tabs.find((t) => t.id !== activeTabId) || null
+  const leftTab = tabs.find((t) => t.id === splitLeftTabId) || currentTab;
+  const rightTab = isSplitScreen
+    ? tabs.find((t) => t.id === splitRightTabId && t.id !== leftTab.id) ||
+      tabs.find((t) => t.id !== leftTab.id) ||
+      tabs[1] ||
+      leftTab
     : null;
 
   // Saved Quick Sessions
@@ -469,6 +480,18 @@ export default function App() {
     setTabs((prev) =>
       prev.map((t) => (t.id === id ? { ...t, hasUnread: false } : t))
     );
+
+    if (isSplitScreen) {
+      // If the selected tab is not currently visible in either pane,
+      // update the active pane to show it
+      if (id !== splitLeftTabId && id !== splitRightTabId) {
+        if (activeTabId === splitRightTabId) {
+          setSplitRightTabId(id);
+        } else {
+          setSplitLeftTabId(id);
+        }
+      }
+    }
   };
 
   // Create New Tab
@@ -488,6 +511,14 @@ export default function App() {
 
     setTabs((prev) => [...prev, newTab]);
     setActiveTabId(newId);
+
+    if (isSplitScreen) {
+      if (activeTabId === splitRightTabId) {
+        setSplitRightTabId(newId);
+      } else {
+        setSplitLeftTabId(newId);
+      }
+    }
 
     // Conecta o socket dedicado para esta nova aba
     connectTabSocket(newId, backendUrl);
@@ -519,6 +550,21 @@ export default function App() {
 
     const nextTabs = tabs.filter((t) => t.id !== idToClose);
     setTabs(nextTabs);
+
+    if (isSplitScreen) {
+      if (nextTabs.length <= 1) {
+        setIsSplitScreen(false);
+      } else {
+        if (splitLeftTabId === idToClose) {
+          const nextL = nextTabs.find((t) => t.id !== splitRightTabId) || nextTabs[0];
+          if (nextL) setSplitLeftTabId(nextL.id);
+        }
+        if (splitRightTabId === idToClose) {
+          const nextR = nextTabs.find((t) => t.id !== splitLeftTabId) || nextTabs[1] || nextTabs[0];
+          if (nextR) setSplitRightTabId(nextR.id);
+        }
+      }
+    }
 
     if (activeTabId === idToClose) {
       const idx = tabs.findIndex((t) => t.id === idToClose);
@@ -890,15 +936,16 @@ export default function App() {
     }
   };
 
-  // Exit remote session on the active tab
-  const exitRemoteSession = (reason = 'Sessão encerrada') => {
-    const socket = tabSocketsRef.current.get(currentTab.id);
+  // Exit remote session on the active or target tab
+  const exitRemoteSession = (reason = 'Sessão encerrada', targetTabId?: string) => {
+    const tabId = targetTabId || activeTabIdRef.current;
+    const socket = tabSocketsRef.current.get(tabId);
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ type: 'close_session' }));
     }
     setTabs((prev) =>
       prev.map((t) =>
-        t.id === currentTab.id
+        t.id === tabId
           ? {
               ...t,
               sessionState: 'local_shell',
@@ -910,18 +957,19 @@ export default function App() {
           : t
       )
     );
-    appendLine(`[-] ${reason}. Retornado ao prompt local.`, 'dim');
-    addLog('WARN', 'DISCONNECT', `Sessão finalizada na aba ${currentTab.id}: ${reason}`);
+    appendLineToTab(tabId, `[-] ${reason}. Retornado ao prompt local.`, 'dim');
+    addLog('WARN', 'DISCONNECT', `Sessão finalizada na aba ${tabId}: ${reason}`);
   };
 
   // Command Execution Hub
-  const executeCommandLine = (rawCommand: string) => {
-    const tabId = currentTab.id;
+  const executeCommandLine = (rawCommand: string, targetTabId?: string) => {
+    const tabId = targetTabId || activeTabIdRef.current;
+    const thisTab = tabsRef.current.find((t) => t.id === tabId) || currentTab;
     const socket = tabSocketsRef.current.get(tabId);
 
     // If waiting for SSH password in this tab
-    if (currentTab.pendingSsh) {
-      const { host, port, user } = currentTab.pendingSsh;
+    if (thisTab.pendingSsh) {
+      const { host, port, user } = thisTab.pendingSsh;
       setTabs((prev) =>
         prev.map((t) =>
           t.id === tabId
@@ -933,7 +981,7 @@ export default function App() {
             : t
         )
       );
-      appendLine(`${user}@${host}'s password: ••••••••`, 'cmd');
+      appendLineToTab(tabId, `${user}@${host}'s password: ••••••••`, 'cmd');
       addLog('DATA', 'SSH', `Enviando credenciais para ${user}@${host}:${port}`);
       if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(
@@ -952,9 +1000,9 @@ export default function App() {
     const trimmed = rawCommand.trim();
 
     // If in remote session, send input directly
-    if (currentTab.sessionState === 'remote_session') {
+    if (thisTab.sessionState === 'remote_session') {
       if (trimmed === 'exit' || trimmed === 'quit') {
-        exitRemoteSession('Comando exit recebido');
+        exitRemoteSession('Comando exit recebido', tabId);
         return;
       }
       if (socket && socket.readyState === WebSocket.OPEN) {
@@ -1921,31 +1969,35 @@ export default function App() {
     appendLine(`Cadastre seus equipamentos no painel lateral [SESSÕES RÁPIDAS]!`, 'success');
   };
 
-  // Keyboard navigation & Enter submission on the active tab
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  // Keyboard navigation & Enter submission on the active or specified tab
+  const handleKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    targetTab: TerminalTab = currentTab
+  ) => {
+    const tabId = targetTab.id;
     if (e.key === 'Enter') {
       e.preventDefault();
-      const current = currentTab.inputValue;
+      const current = targetTab.inputValue;
       setTabs((prev) =>
-        prev.map((t) => (t.id === currentTab.id ? { ...t, inputValue: '' } : t))
+        prev.map((t) => (t.id === tabId ? { ...t, inputValue: '' } : t))
       );
 
       // Freeze command into terminal output
-      const prefix = getPromptPrefix();
-      appendLine(`${prefix} ${current}`, 'cmd');
+      const prefix = getPromptPrefix(targetTab);
+      appendLineToTab(tabId, `${prefix} ${current}`, 'cmd');
 
-      executeCommandLine(current);
+      executeCommandLine(current, tabId);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      if (currentTab.history.length === 0) return;
+      if (targetTab.history.length === 0) return;
       let newIdx =
-        currentTab.historyIndex === -1
-          ? currentTab.history.length - 1
-          : currentTab.historyIndex - 1;
+        targetTab.historyIndex === -1
+          ? targetTab.history.length - 1
+          : targetTab.historyIndex - 1;
       if (newIdx < 0) newIdx = 0;
       setTabs((prev) =>
         prev.map((t) =>
-          t.id === currentTab.id
+          t.id === tabId
             ? {
                 ...t,
                 historyIndex: newIdx,
@@ -1956,12 +2008,12 @@ export default function App() {
       );
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      if (currentTab.history.length === 0 || currentTab.historyIndex === -1) return;
-      const newIdx = currentTab.historyIndex + 1;
-      if (newIdx >= currentTab.history.length) {
+      if (targetTab.history.length === 0 || targetTab.historyIndex === -1) return;
+      const newIdx = targetTab.historyIndex + 1;
+      if (newIdx >= targetTab.history.length) {
         setTabs((prev) =>
           prev.map((t) =>
-            t.id === currentTab.id
+            t.id === tabId
               ? {
                   ...t,
                   historyIndex: -1,
@@ -1973,7 +2025,7 @@ export default function App() {
       } else {
         setTabs((prev) =>
           prev.map((t) =>
-            t.id === currentTab.id
+            t.id === tabId
               ? {
                   ...t,
                   historyIndex: newIdx,
@@ -1985,19 +2037,20 @@ export default function App() {
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      const rawInput = currentTab.inputValue;
-      const result = getEquipmentCompletions(rawInput, currentTab);
+      const rawInput = targetTab.inputValue;
+      const result = getEquipmentCompletions(rawInput, targetTab);
 
       if (result.completedText) {
         setTabs((prev) =>
           prev.map((t) =>
-            t.id === currentTab.id ? { ...t, inputValue: result.completedText! } : t
+            t.id === tabId ? { ...t, inputValue: result.completedText! } : t
           )
         );
       }
 
       if (result.suggestions.length > 0 && (!result.completedText || result.suggestions.length > 1)) {
-        appendLine(
+        appendLineToTab(
+          tabId,
           `[TAB ${result.equipmentLabel}] ${result.suggestions.slice(0, 8).join('  •  ')}${
             result.suggestions.length > 8 ? ' ...' : ''
           }`,
@@ -2005,48 +2058,48 @@ export default function App() {
         );
       }
     } else if (e.key === 'c' && e.ctrlKey) {
-      appendLine('^C', 'warning');
+      appendLineToTab(tabId, '^C', 'warning');
       setTabs((prev) =>
-        prev.map((t) => (t.id === currentTab.id ? { ...t, inputValue: '' } : t))
+        prev.map((t) => (t.id === tabId ? { ...t, inputValue: '' } : t))
       );
-      if (currentTab.sessionState === 'remote_session') {
-        exitRemoteSession('Interrompido via ^C');
+      if (targetTab.sessionState === 'remote_session') {
+        exitRemoteSession('Interrompido via ^C', tabId);
       }
     } else if (e.key === 'l' && e.ctrlKey) {
       e.preventDefault();
       setTabs((prev) =>
-        prev.map((t) => (t.id === currentTab.id ? { ...t, lines: [] } : t))
+        prev.map((t) => (t.id === tabId ? { ...t, lines: [] } : t))
       );
     }
   };
 
-  const getPromptPrefix = () => {
-    if (currentTab.isPasswordInput) {
+  const getPromptPrefix = (tab: TerminalTab = currentTab) => {
+    if (tab.isPasswordInput) {
       return '';
     }
-    if (currentTab.sessionState === 'remote_session') {
+    if (tab.sessionState === 'remote_session') {
       return '> ';
     }
     if (
-      currentTab.shellType === 'bash' ||
-      currentTab.shellType === 'zsh' ||
-      currentTab.shellType === 'sh' ||
+      tab.shellType === 'bash' ||
+      tab.shellType === 'zsh' ||
+      tab.shellType === 'sh' ||
       detectedPlatform === 'darwin' ||
       detectedPlatform === 'linux'
     ) {
-      const formattedPath = currentTab.currentPath.replace(/^\/Users\/[^/]+|^\/home\/[^/]+/, '~');
-      return `${currentTab.currentUsername}@cyberdeck:${formattedPath}$ `;
+      const formattedPath = tab.currentPath.replace(/^\/Users\/[^/]+|^\/home\/[^/]+/, '~');
+      return `${tab.currentUsername}@cyberdeck:${formattedPath}$ `;
     }
-    if (currentTab.shellType === 'powershell') {
-      return `PS ${currentTab.currentPath}> `;
+    if (tab.shellType === 'powershell') {
+      return `PS ${tab.currentPath}> `;
     }
-    return `${currentTab.currentPath}> `;
+    return `${tab.currentPath}> `;
   };
 
-  const getPromptColorClass = () => {
-    if (currentTab.sessionState === 'remote_session') return 'text-cyan-400';
-    if (currentTab.shellType === 'powershell') return 'text-emerald-400';
-    if (currentTab.shellType === 'bash' || currentTab.shellType === 'zsh') return 'text-cyan-300';
+  const getPromptColorClass = (tab: TerminalTab = currentTab) => {
+    if (tab.sessionState === 'remote_session') return 'text-cyan-400';
+    if (tab.shellType === 'powershell') return 'text-emerald-400';
+    if (tab.shellType === 'bash' || tab.shellType === 'zsh') return 'text-cyan-300';
     return 'text-white';
   };
 
@@ -2140,85 +2193,177 @@ export default function App() {
       <div className="relative flex-1 flex flex-col lg:flex-row gap-3 min-h-0 mt-1">
         {/* Main Terminal Screen or Split-Screen Dual Panes */}
         <div className={`flex-1 flex flex-col min-h-0 ${mobileTab === 'terminal' ? 'flex' : 'hidden lg:flex'}`}>
-          {isSplitScreen && secondaryTab ? (
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-2 min-h-0">
-              {/* Left Pane (Primary Active Tab) */}
-              <div className="flex-1 flex flex-col min-h-0 border border-emerald-500/40 rounded-lg overflow-hidden bg-black/40">
-                <div className="px-2.5 py-1 bg-zinc-900/80 border-b border-zinc-800 flex items-center justify-between text-[11px] font-bold text-emerald-400 shrink-0">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>PAINEL 1: {currentTab.title}</span>
+          {isSplitScreen && rightTab ? (
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 min-h-0">
+              {/* Left Pane (Painel 1) */}
+              <div
+                onClick={() => handleSelectTab(leftTab.id)}
+                className={`flex-1 flex flex-col min-h-0 rounded-lg overflow-hidden transition-all duration-200 ${
+                  activeTabId === leftTab.id
+                    ? 'border-2 border-emerald-400 ring-2 ring-emerald-400/30 shadow-[0_0_22px_rgba(16,185,129,0.3)] bg-black/60'
+                    : 'border border-zinc-800 bg-black/30 hover:border-zinc-700 opacity-75 hover:opacity-95 cursor-pointer'
+                }`}
+              >
+                {/* Header Bar Left Pane */}
+                <div
+                  className={`px-3 py-1.5 flex items-center justify-between text-[11px] font-bold shrink-0 transition-colors ${
+                    activeTabId === leftTab.id
+                      ? 'bg-emerald-950/80 border-b border-emerald-500/40 text-emerald-300'
+                      : 'bg-zinc-900/70 border-b border-zinc-800 text-zinc-400'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        activeTabId === leftTab.id
+                          ? 'bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse'
+                          : 'bg-zinc-600'
+                      }`}
+                    />
+                    <span className="font-mono tracking-wide uppercase truncate">
+                      PAINEL 1: {leftTab.title}
+                    </span>
+                    {activeTabId === leftTab.id ? (
+                      <span className="px-2 py-0.5 rounded text-[9px] font-mono tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 flex items-center gap-1 shadow-sm shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                        EM FOCO (DIGITANDO AQUI)
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-mono tracking-wider bg-zinc-800 text-zinc-400 border border-zinc-700 shrink-0">
+                        INATIVO — CLIQUE P/ FOCAR
+                      </span>
+                    )}
                   </div>
-                  <span className="text-[10px] text-zinc-400 uppercase font-mono">{currentTab.protocol}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-black/40 border border-current opacity-70">
+                      {leftTab.protocol}
+                    </span>
+                    {activeTabId !== leftTab.id && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectTab(leftTab.id);
+                        }}
+                        className="px-2 py-0.5 rounded text-[9px] bg-emerald-950/60 border border-emerald-500/40 hover:bg-emerald-900 text-emerald-300 cursor-pointer font-mono"
+                        title="Ativar terminal 1"
+                      >
+                        ATIVAR
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {/* Terminal Content Left Pane */}
                 <div className="flex-1 flex flex-col min-h-0">
                   <TerminalScreen
-                    lines={currentTab.lines}
-                    inputValue={currentTab.inputValue}
-                    isPassword={currentTab.isPasswordInput}
-                    promptPrefix={getPromptPrefix()}
-                    promptColorClass={getPromptColorClass()}
-                    onInputChange={(val) =>
+                    lines={leftTab.lines}
+                    inputValue={leftTab.inputValue}
+                    isPassword={leftTab.isPasswordInput}
+                    promptPrefix={getPromptPrefix(leftTab)}
+                    promptColorClass={getPromptColorClass(leftTab)}
+                    isActive={activeTabId === leftTab.id}
+                    onFocusPane={() => handleSelectTab(leftTab.id)}
+                    onInputChange={(val) => {
                       setTabs((prev) =>
-                        prev.map((t) => (t.id === currentTab.id ? { ...t, inputValue: val } : t))
-                      )
-                    }
-                    onSubmit={executeCommandLine}
-                    onKeyDown={handleKeyDown}
+                        prev.map((t) => (t.id === leftTab.id ? { ...t, inputValue: val } : t))
+                      );
+                    }}
+                    onSubmit={(val) => executeCommandLine(val, leftTab.id)}
+                    onKeyDown={(e) => handleKeyDown(e, leftTab)}
                     crtConfig={crtConfig}
                     typographyConfig={typographyConfig}
                   />
                 </div>
               </div>
 
-              {/* Right Pane (Secondary Split Tab) */}
-              <div className="flex-1 flex flex-col min-h-0 border border-cyan-500/40 rounded-lg overflow-hidden bg-black/40">
-                <div className="px-2.5 py-1 bg-zinc-900/80 border-b border-zinc-800 flex items-center justify-between text-[11px] font-bold text-cyan-400 shrink-0">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                    <span>PAINEL 2: {secondaryTab.title}</span>
+              {/* Right Pane (Painel 2) */}
+              <div
+                onClick={() => handleSelectTab(rightTab.id)}
+                className={`flex-1 flex flex-col min-h-0 rounded-lg overflow-hidden transition-all duration-200 ${
+                  activeTabId === rightTab.id
+                    ? 'border-2 border-cyan-400 ring-2 ring-cyan-400/30 shadow-[0_0_22px_rgba(6,182,212,0.3)] bg-black/60'
+                    : 'border border-zinc-800 bg-black/30 hover:border-zinc-700 opacity-75 hover:opacity-95 cursor-pointer'
+                }`}
+              >
+                {/* Header Bar Right Pane */}
+                <div
+                  className={`px-3 py-1.5 flex items-center justify-between text-[11px] font-bold shrink-0 transition-colors ${
+                    activeTabId === rightTab.id
+                      ? 'bg-cyan-950/80 border-b border-cyan-500/40 text-cyan-300'
+                      : 'bg-zinc-900/70 border-b border-zinc-800 text-zinc-400'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        activeTabId === rightTab.id
+                          ? 'bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse'
+                          : 'bg-zinc-600'
+                      }`}
+                    />
+                    <span className="font-mono tracking-wide uppercase truncate">
+                      PAINEL 2: {rightTab.title}
+                    </span>
+                    {activeTabId === rightTab.id ? (
+                      <span className="px-2 py-0.5 rounded text-[9px] font-mono tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 flex items-center gap-1 shadow-sm shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                        EM FOCO (DIGITANDO AQUI)
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-mono tracking-wider bg-zinc-800 text-zinc-400 border border-zinc-700 shrink-0">
+                        INATIVO — CLIQUE P/ FOCAR
+                      </span>
+                    )}
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-black/40 border border-current opacity-70">
+                      {rightTab.protocol}
+                    </span>
+                    {activeTabId !== rightTab.id && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectTab(rightTab.id);
+                        }}
+                        className="px-2 py-0.5 rounded text-[9px] bg-cyan-950/60 border border-cyan-500/40 hover:bg-cyan-900 text-cyan-300 cursor-pointer font-mono"
+                        title="Ativar terminal 2"
+                      >
+                        ATIVAR
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => handleSelectTab(secondaryTab.id)}
-                      className="px-1.5 py-0.5 rounded text-[9px] bg-cyan-950/60 border border-cyan-500/40 hover:bg-cyan-900 text-cyan-300"
-                      title="Focar neste terminal"
-                    >
-                      FOCAR
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsSplitScreen(false)}
-                      className="p-0.5 rounded text-zinc-400 hover:text-rose-400"
-                      title="Fechar tela dividida"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsSplitScreen(false);
+                      }}
+                      className="p-1 rounded text-zinc-400 hover:text-rose-400 hover:bg-zinc-800/60 transition-colors"
+                      title="Fechar tela dividida e voltar a 1 terminal"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
+
+                {/* Terminal Content Right Pane */}
                 <div className="flex-1 flex flex-col min-h-0">
                   <TerminalScreen
-                    lines={secondaryTab.lines}
-                    inputValue={secondaryTab.inputValue}
-                    isPassword={secondaryTab.isPasswordInput}
-                    promptPrefix={secondaryTab.isPasswordInput ? '' : `${secondaryTab.currentPath}> `}
-                    promptColorClass="text-cyan-400"
-                    onInputChange={(val) =>
+                    lines={rightTab.lines}
+                    inputValue={rightTab.inputValue}
+                    isPassword={rightTab.isPasswordInput}
+                    promptPrefix={getPromptPrefix(rightTab)}
+                    promptColorClass={getPromptColorClass(rightTab)}
+                    isActive={activeTabId === rightTab.id}
+                    onFocusPane={() => handleSelectTab(rightTab.id)}
+                    onInputChange={(val) => {
                       setTabs((prev) =>
-                        prev.map((t) => (t.id === secondaryTab.id ? { ...t, inputValue: val } : t))
-                      )
-                    }
-                    onSubmit={(val) => {
-                      handleSelectTab(secondaryTab.id);
-                      executeCommandLine(val);
+                        prev.map((t) => (t.id === rightTab.id ? { ...t, inputValue: val } : t))
+                      );
                     }}
-                    onKeyDown={(e) => {
-                      if (activeTabId !== secondaryTab.id) {
-                        handleSelectTab(secondaryTab.id);
-                      }
-                      handleKeyDown(e);
-                    }}
+                    onSubmit={(val) => executeCommandLine(val, rightTab.id)}
+                    onKeyDown={(e) => handleKeyDown(e, rightTab)}
                     crtConfig={crtConfig}
                     typographyConfig={typographyConfig}
                   />
@@ -2230,15 +2375,16 @@ export default function App() {
               lines={currentTab.lines}
               inputValue={currentTab.inputValue}
               isPassword={currentTab.isPasswordInput}
-              promptPrefix={getPromptPrefix()}
-              promptColorClass={getPromptColorClass()}
+              promptPrefix={getPromptPrefix(currentTab)}
+              promptColorClass={getPromptColorClass(currentTab)}
+              isActive={true}
               onInputChange={(val) =>
                 setTabs((prev) =>
                   prev.map((t) => (t.id === currentTab.id ? { ...t, inputValue: val } : t))
                 )
               }
-              onSubmit={executeCommandLine}
-              onKeyDown={handleKeyDown}
+              onSubmit={(val) => executeCommandLine(val, currentTab.id)}
+              onKeyDown={(e) => handleKeyDown(e, currentTab)}
               crtConfig={crtConfig}
               typographyConfig={typographyConfig}
             />
