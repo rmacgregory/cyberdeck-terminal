@@ -572,6 +572,74 @@ body[data-theme="magenta"] .crt-real-screen {
   }
 }
 
+/* CRT Coil Degaussing (Desmagnetização da Bobina) Effect */
+.crt-degaussing {
+  animation: crt-degauss-shake 1.75s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+  will-change: transform, filter;
+}
+
+@keyframes crt-degauss-shake {
+  0% {
+    transform: scale(1) rotate(0deg) skew(0deg);
+    filter: brightness(2.2) contrast(1.8) hue-rotate(90deg) saturate(3);
+  }
+  5% {
+    transform: scale(1.04, 0.96) translate(-8px, 6px) rotate(1.2deg) skew(-2deg);
+    filter: brightness(2.8) contrast(2) hue-rotate(180deg) saturate(4) blur(1.5px);
+  }
+  12% {
+    transform: scale(0.97, 1.05) translate(10px, -7px) rotate(-1.5deg) skew(3deg);
+    filter: brightness(2.2) contrast(1.7) hue-rotate(270deg) saturate(3.5) blur(2px);
+  }
+  20% {
+    transform: scale(1.03, 0.98) translate(-9px, -5px) rotate(1.1deg) skew(-2.5deg);
+    filter: brightness(1.8) contrast(1.5) hue-rotate(360deg) saturate(2.5) blur(1px);
+  }
+  30% {
+    transform: scale(0.98, 1.02) translate(7px, 6px) rotate(-0.8deg) skew(1.8deg);
+    filter: brightness(1.5) contrast(1.3) hue-rotate(90deg) saturate(2);
+  }
+  42% {
+    transform: scale(1.015, 0.99) translate(-5px, 4px) rotate(0.6deg) skew(-1deg);
+    filter: brightness(1.3) contrast(1.2) hue-rotate(45deg);
+  }
+  55% {
+    transform: scale(0.99, 1.01) translate(4px, -3px) rotate(-0.4deg) skew(0.7deg);
+    filter: brightness(1.18) contrast(1.1) hue-rotate(20deg);
+  }
+  70% {
+    transform: scale(1.008, 0.995) translate(-2px, 2px) rotate(0.2deg);
+    filter: brightness(1.08) contrast(1.05);
+  }
+  85% {
+    transform: scale(0.998, 1.002) translate(1px, -1px) rotate(-0.1deg);
+    filter: brightness(1.03);
+  }
+  100% {
+    transform: scale(1) translate(0, 0) rotate(0deg) skew(0deg);
+    filter: brightness(1);
+  }
+}
+
+.crt-degauss-flash-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.85) 0%, rgba(0, 240, 255, 0.4) 30%, rgba(255, 0, 128, 0.3) 60%, transparent 90%);
+  mix-blend-mode: color-dodge;
+  animation: crt-degauss-flash-decay 1.75s ease-out forwards;
+}
+
+@keyframes crt-degauss-flash-decay {
+  0% { opacity: 0.9; }
+  15% { opacity: 0.7; }
+  45% { opacity: 0.3; }
+  80% { opacity: 0.08; }
+  100% { opacity: 0; display: none; }
+}
+
+
 
 
 

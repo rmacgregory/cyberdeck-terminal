@@ -26,7 +26,12 @@ import { ConnectionLogsPanel } from './components/ConnectionLogsPanel';
 import { QuickSessionModal } from './components/QuickSessionModal';
 import { IntegratedBrowser } from './components/IntegratedBrowser';
 import { getEquipmentCompletions } from './utils/equipmentCompletion';
-import { Terminal, Layers, Activity, Globe } from 'lucide-react';
+import { audioSynthesizer } from './utils/audioEffects';
+import {
+  loadPersistentCommandHistory,
+  savePersistentCommandHistory,
+} from './utils/commandHistory';
+import { Terminal, Layers, Activity, Globe, Columns, X } from 'lucide-react';
 
 const WELCOME_BANNER = `
    ______      __              ____             __  
@@ -172,7 +177,7 @@ export default function App() {
         },
       ],
       inputValue: '',
-      history: [],
+      history: loadPersistentCommandHistory(),
       historyIndex: -1,
       pendingSsh: null,
       isPasswordInput: false,
@@ -187,6 +192,40 @@ export default function App() {
   ]);
   const [activeTabId, setActiveTabId] = useState<string>('tab-1');
 
+  // SPLIT-SCREEN STATE
+  const [isSplitScreen, setIsSplitScreen] = useState<boolean>(false);
+  const [secondaryTabId, setSecondaryTabId] = useState<string | null>(null);
+
+  // DEGAUSS (Desmagnetização da Bobina CRT) STATE
+  const [isDegaussing, setIsDegaussing] = useState<boolean>(false);
+
+  const triggerDegauss = () => {
+    if (isDegaussing) return;
+    setIsDegaussing(true);
+    audioSynthesizer.playDegaussSound();
+    setTimeout(() => {
+      setIsDegaussing(false);
+    }, 1750);
+  };
+
+  const toggleSplitScreen = () => {
+    setIsSplitScreen((prev) => {
+      const next = !prev;
+      if (next) {
+        const other = tabs.find((t) => t.id !== activeTabId);
+        if (other) {
+          setSecondaryTabId(other.id);
+        } else {
+          const newId = `tab-${Date.now()}`;
+          const newTab = createNewTab(newId, `Console ${tabs.length + 1} - Split`, 'LOCAL');
+          setTabs((curr) => [...curr, newTab]);
+          setSecondaryTabId(newId);
+        }
+      }
+      return next;
+    });
+  };
+
   // Keep fresh refs to active tab & tabs list for socket events
   const activeTabIdRef = useRef<string>('tab-1');
   activeTabIdRef.current = activeTabId;
@@ -194,6 +233,9 @@ export default function App() {
   tabsRef.current = tabs;
 
   const currentTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
+  const secondaryTab = isSplitScreen
+    ? tabs.find((t) => t.id === secondaryTabId) || tabs.find((t) => t.id !== activeTabId) || null
+    : null;
 
   // Saved Quick Sessions
   const [sessions, setSessions] = useState<QuickSession[]>(() => {
@@ -923,13 +965,14 @@ export default function App() {
 
     if (!trimmed) return;
 
-    // Record history in this tab
+    // Record history persistently across reloads & in tab buffer
+    const updatedHistory = savePersistentCommandHistory(trimmed);
     setTabs((prev) =>
       prev.map((t) =>
         t.id === tabId
           ? {
               ...t,
-              history: [...t.history, trimmed],
+              history: updatedHistory.length > 0 ? updatedHistory : [...t.history, trimmed],
               historyIndex: -1,
             }
           : t
@@ -1248,36 +1291,38 @@ export default function App() {
 
     if (cmd === 'jitter' || cmd === 'tremor') {
       const sub = args[0]?.toLowerCase();
-      if (!sub) {
-        const isAct = crtConfig.jitter && (crtConfig.jitterIntensity ?? 30) > 0;
-        appendLine(
-          `[*] Nível de tremor CRT (Jitter): ${
-            isAct ? `${crtConfig.jitterIntensity ?? 30}% (LIGADO)` : 'DESLIGADO'
-          }`,
-          'info'
-        );
-        appendLine('Uso: jitter <0-100|off|on> (ex: jitter 35 ou jitter off)', 'dim');
-        return;
-      }
-
       if (sub === 'off' || sub === 'desligar' || sub === '0') {
         updateCrtConfig({ jitter: false, jitterIntensity: 0 });
         appendLine('[*] Tremor da imagem CRT (Jitter) DESLIGADO', 'info');
-      } else if (sub === 'on' || sub === 'ligar') {
-        updateCrtConfig({ jitter: true, jitterIntensity: crtConfig.jitterIntensity || 35 });
-        appendLine(`[*] Tremor da imagem CRT (Jitter) LIGADO (${crtConfig.jitterIntensity || 35}%)`, 'success');
+      } else if (sub === 'on' || sub === 'ligar' || sub === '1') {
+        updateCrtConfig({ jitter: true, jitterIntensity: 15 });
+        appendLine('[*] Tremor da imagem CRT (Jitter) LIGADO (Nível Leve: 15%)', 'success');
       } else {
-        const val = parseInt(sub.replace('%', ''), 10);
-        if (isNaN(val) || val < 0 || val > 100) {
-          appendLine('Valor inválido. Use um número de 0 (desligado) a 100% (ex: jitter 35)', 'error');
-          return;
-        }
-        updateCrtConfig({ jitter: val > 0, jitterIntensity: val });
+        const nextJitter = !crtConfig.jitter;
+        updateCrtConfig({ jitter: nextJitter, jitterIntensity: nextJitter ? 15 : 0 });
         appendLine(
-          `[*] Tremor da imagem CRT (Jitter) ajustado para: ${val === 0 ? 'DESLIGADO' : `${val}%`}`,
-          'success'
+          `[*] Tremor da imagem CRT (Jitter): ${nextJitter ? 'LIGADO (Nível Leve: 15%)' : 'DESLIGADO'}`,
+          nextJitter ? 'success' : 'info'
         );
+        appendLine('Uso: jitter on | jitter off', 'dim');
       }
+      return;
+    }
+
+    if (cmd === 'degauss' || cmd === 'desmagnetizar' || cmd === 'bobina') {
+      triggerDegauss();
+      appendLine('[*] DESMAGNETIZAÇÃO CRT ATIVADA (Degauss Coil Solenoid Discharge)', 'warning');
+      appendLine('Pulso eletromagnético emitido. Bobina de deflexão e máscara de sombra recalibradas.', 'dim');
+      addLog('WARN', 'HARDWARE', 'Ciclo de desmagnetização Degauss disparado');
+      return;
+    }
+
+    if (cmd === 'split' || cmd === 'dividir' || cmd === 'splitscreen') {
+      toggleSplitScreen();
+      appendLine(
+        `[*] Modo Split-Screen: ${!isSplitScreen ? 'ATIVADO (Terminais lado a lado)' : 'DESATIVADO (Tela cheia)'}`,
+        'info'
+      );
       return;
     }
 
@@ -2030,6 +2075,10 @@ export default function App() {
         systemMetrics={systemMetrics}
         isBrowserOpen={isBrowserOpen}
         onToggleBrowser={() => setIsBrowserOpen((prev) => !prev)}
+        onTriggerDegauss={triggerDegauss}
+        isDegaussing={isDegaussing}
+        isSplitScreen={isSplitScreen}
+        onToggleSplitScreen={toggleSplitScreen}
       />
 
       {/* Terminal Multi-Tabs Bar */}
@@ -2089,24 +2138,111 @@ export default function App() {
 
       {/* Center Body: Terminal Workspace with Inline Typing + Right Sidebar */}
       <div className="relative flex-1 flex flex-col lg:flex-row gap-3 min-h-0 mt-1">
-        {/* Main Terminal Screen of the Active Tab */}
+        {/* Main Terminal Screen or Split-Screen Dual Panes */}
         <div className={`flex-1 flex flex-col min-h-0 ${mobileTab === 'terminal' ? 'flex' : 'hidden lg:flex'}`}>
-          <TerminalScreen
-            lines={currentTab.lines}
-            inputValue={currentTab.inputValue}
-            isPassword={currentTab.isPasswordInput}
-            promptPrefix={getPromptPrefix()}
-            promptColorClass={getPromptColorClass()}
-            onInputChange={(val) =>
-              setTabs((prev) =>
-                prev.map((t) => (t.id === currentTab.id ? { ...t, inputValue: val } : t))
-              )
-            }
-            onSubmit={executeCommandLine}
-            onKeyDown={handleKeyDown}
-            crtConfig={crtConfig}
-            typographyConfig={typographyConfig}
-          />
+          {isSplitScreen && secondaryTab ? (
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-2 min-h-0">
+              {/* Left Pane (Primary Active Tab) */}
+              <div className="flex-1 flex flex-col min-h-0 border border-emerald-500/40 rounded-lg overflow-hidden bg-black/40">
+                <div className="px-2.5 py-1 bg-zinc-900/80 border-b border-zinc-800 flex items-center justify-between text-[11px] font-bold text-emerald-400 shrink-0">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>PAINEL 1: {currentTab.title}</span>
+                  </div>
+                  <span className="text-[10px] text-zinc-400 uppercase font-mono">{currentTab.protocol}</span>
+                </div>
+                <div className="flex-1 flex flex-col min-h-0">
+                  <TerminalScreen
+                    lines={currentTab.lines}
+                    inputValue={currentTab.inputValue}
+                    isPassword={currentTab.isPasswordInput}
+                    promptPrefix={getPromptPrefix()}
+                    promptColorClass={getPromptColorClass()}
+                    onInputChange={(val) =>
+                      setTabs((prev) =>
+                        prev.map((t) => (t.id === currentTab.id ? { ...t, inputValue: val } : t))
+                      )
+                    }
+                    onSubmit={executeCommandLine}
+                    onKeyDown={handleKeyDown}
+                    crtConfig={crtConfig}
+                    typographyConfig={typographyConfig}
+                  />
+                </div>
+              </div>
+
+              {/* Right Pane (Secondary Split Tab) */}
+              <div className="flex-1 flex flex-col min-h-0 border border-cyan-500/40 rounded-lg overflow-hidden bg-black/40">
+                <div className="px-2.5 py-1 bg-zinc-900/80 border-b border-zinc-800 flex items-center justify-between text-[11px] font-bold text-cyan-400 shrink-0">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                    <span>PAINEL 2: {secondaryTab.title}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectTab(secondaryTab.id)}
+                      className="px-1.5 py-0.5 rounded text-[9px] bg-cyan-950/60 border border-cyan-500/40 hover:bg-cyan-900 text-cyan-300"
+                      title="Focar neste terminal"
+                    >
+                      FOCAR
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsSplitScreen(false)}
+                      className="p-0.5 rounded text-zinc-400 hover:text-rose-400"
+                      title="Fechar tela dividida"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 flex flex-col min-h-0">
+                  <TerminalScreen
+                    lines={secondaryTab.lines}
+                    inputValue={secondaryTab.inputValue}
+                    isPassword={secondaryTab.isPasswordInput}
+                    promptPrefix={secondaryTab.isPasswordInput ? '' : `${secondaryTab.currentPath}> `}
+                    promptColorClass="text-cyan-400"
+                    onInputChange={(val) =>
+                      setTabs((prev) =>
+                        prev.map((t) => (t.id === secondaryTab.id ? { ...t, inputValue: val } : t))
+                      )
+                    }
+                    onSubmit={(val) => {
+                      handleSelectTab(secondaryTab.id);
+                      executeCommandLine(val);
+                    }}
+                    onKeyDown={(e) => {
+                      if (activeTabId !== secondaryTab.id) {
+                        handleSelectTab(secondaryTab.id);
+                      }
+                      handleKeyDown(e);
+                    }}
+                    crtConfig={crtConfig}
+                    typographyConfig={typographyConfig}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <TerminalScreen
+              lines={currentTab.lines}
+              inputValue={currentTab.inputValue}
+              isPassword={currentTab.isPasswordInput}
+              promptPrefix={getPromptPrefix()}
+              promptColorClass={getPromptColorClass()}
+              onInputChange={(val) =>
+                setTabs((prev) =>
+                  prev.map((t) => (t.id === currentTab.id ? { ...t, inputValue: val } : t))
+                )
+              }
+              onSubmit={executeCommandLine}
+              onKeyDown={handleKeyDown}
+              crtConfig={crtConfig}
+              typographyConfig={typographyConfig}
+            />
+          )}
         </div>
 
         {/* Sidebar: Quick Sessions + Real-Time Connection Logs */}
@@ -2137,7 +2273,7 @@ export default function App() {
       <footer className="mt-2 pt-1 border-t border-zinc-900 flex flex-wrap items-center justify-between text-[10px] opacity-65 tracking-widest font-mono shrink-0">
         <div>TERMINAL: CROSS-PLATFORM // WIN • LINUX • MAC • ANDROID // ABA: {currentTab.title}</div>
         <div>PROTOCOLS: POWERSHELL • SSH • TELNET • ICMP • RAW TCP</div>
-        <div>ABAS ATIVAS: {tabs.length}</div>
+        <div>ABAS ATIVAS: {tabs.length}{isSplitScreen ? ' [SPLIT-SCREEN ATIVO]' : ''}</div>
       </footer>
 
       {/* Modal to add new Quick Session */}
@@ -2168,7 +2304,7 @@ export default function App() {
       <div
         className={`crt-real-screen crt-brightness-layer flex-1 flex flex-col min-h-0 w-full h-full relative overflow-hidden p-2 sm:p-3 md:p-4 ${
           crtConfig.curvature ? 'crt-barrel-warp' : ''
-        }`}
+        } ${isDegaussing ? 'crt-degaussing' : ''}`}
       >
         {/* Full-screen CRT Optical Layers */}
         {crtConfig.scanlines && <div className="crt-scanlines-real" />}
@@ -2182,6 +2318,7 @@ export default function App() {
             <div className="crt-hertz-band-secondary" />
           </div>
         )}
+        {isDegaussing && <div className="crt-degauss-flash-overlay" />}
 
         {appContent}
       </div>
@@ -2197,7 +2334,7 @@ export default function App() {
   // SUBTLE CRT MODE: Scanline overlay on monitor background
   if (crtConfig.mode === 'subtle') {
     return (
-      <div className="w-full h-screen flex flex-col p-2 sm:p-4 crt-monitor crt-brightness-layer overflow-hidden select-text relative">
+      <div className={`w-full h-screen flex flex-col p-2 sm:p-4 crt-monitor crt-brightness-layer overflow-hidden select-text relative ${isDegaussing ? 'crt-degaussing' : ''}`}>
         <div className="crt-overlay"></div>
         {crtConfig.hertz && (
           <div className="crt-hertz-container" aria-hidden="true">
@@ -2205,6 +2342,7 @@ export default function App() {
             <div className="crt-hertz-band-secondary" />
           </div>
         )}
+        {isDegaussing && <div className="crt-degauss-flash-overlay" />}
         {appContent}
       </div>
     );
@@ -2212,7 +2350,8 @@ export default function App() {
 
   // CRT OFF: Clean flat display
   return (
-    <div className="w-full h-screen flex flex-col p-2 sm:p-4 bg-[#07090b] crt-brightness-layer text-zinc-100 overflow-hidden select-text">
+    <div className={`w-full h-screen flex flex-col p-2 sm:p-4 bg-[#07090b] crt-brightness-layer text-zinc-100 overflow-hidden select-text relative ${isDegaussing ? 'crt-degaussing' : ''}`}>
+      {isDegaussing && <div className="crt-degauss-flash-overlay" />}
       {appContent}
     </div>
   );
