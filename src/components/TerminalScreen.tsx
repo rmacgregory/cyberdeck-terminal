@@ -37,8 +37,32 @@ export const TerminalScreen: React.FC<TerminalScreenProps> = ({
   useEffect(() => {
     if (isActive) {
       inputRef.current?.focus();
+      updateCursorFromInput();
     }
   }, [isActive]);
+
+  // Cursor position state for true retro terminal caret movement
+  const [cursorPos, setCursorPos] = useState<number>(inputValue.length);
+  const isUserTypingRef = useRef<boolean>(false);
+
+  const updateCursorFromInput = () => {
+    if (inputRef.current) {
+      const pos = inputRef.current.selectionStart ?? inputRef.current.value.length;
+      setCursorPos(pos);
+    }
+  };
+
+  // Synchronize cursor position when inputValue changes externally (history, autocompletion, etc.)
+  useEffect(() => {
+    if (isUserTypingRef.current) {
+      isUserTypingRef.current = false;
+      return;
+    }
+    if (inputRef.current) {
+      inputRef.current.setSelectionRange(inputValue.length, inputValue.length);
+    }
+    setCursorPos(inputValue.length);
+  }, [inputValue]);
 
   // Phosphor Persistence (Ghosting) active check: ONLY active if mode === 'real' and phosphorGhosting is true
   const isGhostingActive = crtConfig.mode === 'real' && Boolean(crtConfig.phosphorGhosting);
@@ -110,6 +134,7 @@ export const TerminalScreen: React.FC<TerminalScreenProps> = ({
       onFocusPane();
     }
     inputRef.current?.focus();
+    updateCursorFromInput();
   };
 
   const getBloomClass = () => {
@@ -250,20 +275,48 @@ export const TerminalScreen: React.FC<TerminalScreenProps> = ({
               </span>
             )}
 
-            {/* Display typed text */}
-            <span
-              className={`whitespace-pre-wrap font-bold text-white tracking-wide break-all relative z-10 ${getBloomClass()}`}
-            >
-              {isPassword ? '•'.repeat(inputValue.length) : inputValue}
-            </span>
-            {/* Blinking block terminal cursor when active, static outline when inactive */}
-            {isActive ? (
-              <span className="term-cursor ml-0.5 shrink-0 relative z-10" />
-            ) : (
-              <span className="w-2 h-4 border border-zinc-500/70 inline-block ml-0.5 shrink-0 relative z-10 opacity-40" />
-            )}
+            {/* Display typed text with authentic CRT block cursor moving between characters */}
+            {(() => {
+              const displayText = isPassword ? '•'.repeat(inputValue.length) : inputValue;
+              const safeCursorPos = Math.min(Math.max(0, cursorPos), displayText.length);
+              const isCursorAtEnd = safeCursorPos >= displayText.length;
+              const textBefore = displayText.slice(0, safeCursorPos);
+              const charUnderCursor = !isCursorAtEnd ? displayText.charAt(safeCursorPos) : '';
+              const textAfter = !isCursorAtEnd ? displayText.slice(safeCursorPos + 1) : '';
 
-            {/* Input capture */}
+              return (
+                <>
+                  <span
+                    className={`whitespace-pre-wrap font-bold text-white tracking-wide break-all relative z-10 ${getBloomClass()}`}
+                  >
+                    {textBefore}
+                    {!isCursorAtEnd && (
+                      isActive ? (
+                        <span className="term-cursor-char relative z-10 font-bold select-none">
+                          {charUnderCursor === ' ' ? '\u00A0' : charUnderCursor}
+                        </span>
+                      ) : (
+                        <span className="border border-zinc-500/70 inline-block px-[1px] opacity-75">
+                          {charUnderCursor === ' ' ? '\u00A0' : charUnderCursor}
+                        </span>
+                      )
+                    )}
+                    {textAfter}
+                  </span>
+
+                  {/* Blinking block terminal cursor at the end of the text */}
+                  {isCursorAtEnd && (
+                    isActive ? (
+                      <span className="term-cursor ml-0.5 shrink-0 relative z-10" />
+                    ) : (
+                      <span className="w-2 h-4 border border-zinc-500/70 inline-block ml-0.5 shrink-0 relative z-10 opacity-40" />
+                    )
+                  )}
+                </>
+              );
+            })()}
+
+            {/* Input capture for keyboard typing, arrows, and caret positioning */}
             <input
               ref={inputRef}
               type={isPassword ? 'password' : 'text'}
@@ -272,18 +325,38 @@ export const TerminalScreen: React.FC<TerminalScreenProps> = ({
               tabIndex={isActive ? 0 : -1}
               onChange={(e) => {
                 if (!isActive) return;
+                isUserTypingRef.current = true;
                 onInputChange(e.target.value);
+                const nextPos = e.target.selectionStart ?? e.target.value.length;
+                setCursorPos(nextPos);
               }}
               onKeyDown={(e) => {
                 if (!isActive) return;
                 onKeyDown(e);
+                // Immediately schedule cursor update for arrow navigation (ArrowLeft, ArrowRight, Home, End)
+                requestAnimationFrame(() => {
+                  updateCursorFromInput();
+                });
+              }}
+              onKeyUp={() => {
+                if (!isActive) return;
+                updateCursorFromInput();
+              }}
+              onSelect={() => {
+                if (!isActive) return;
+                updateCursorFromInput();
+              }}
+              onClick={() => {
+                if (!isActive) return;
+                updateCursorFromInput();
               }}
               onFocus={() => {
                 if (!isActive && onFocusPane) {
                   onFocusPane();
                 }
+                updateCursorFromInput();
               }}
-              className={`absolute inset-0 w-full h-full opacity-0 z-20 text-transparent bg-transparent ${
+              className={`absolute inset-0 w-full h-full opacity-0 z-20 text-transparent bg-transparent caret-transparent outline-none border-0 ${getFontFamilyClass()} ${getFontSizeClass()} tracking-wide ${
                 isActive ? 'cursor-text' : 'cursor-pointer'
               }`}
               autoFocus={isActive}

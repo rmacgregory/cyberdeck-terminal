@@ -470,6 +470,20 @@ body[data-theme="magenta"] .crt-real-screen {
   50%, 100% { opacity: 0; }
 }
 
+@keyframes cursor-char-blink {
+  0%, 49% {
+    background-color: var(--glow-color);
+    color: #000000 !important;
+    text-shadow: none !important;
+    box-shadow: 0 0 8px var(--glow-color), 0 0 14px var(--glow-color);
+  }
+  50%, 100% {
+    background-color: transparent;
+    color: #ffffff !important;
+    box-shadow: none;
+  }
+}
+
 .term-cursor {
   display: inline-block;
   width: 9px;
@@ -479,6 +493,16 @@ body[data-theme="magenta"] .crt-real-screen {
   box-shadow: 0 0 8px var(--glow-color), 0 0 16px var(--glow-color);
   animation: var(--term-cursor-animation, cursor-blink 0.9s infinite);
   transition: opacity 0.15s ease;
+}
+
+.term-cursor-char {
+  display: inline;
+  background-color: var(--glow-color);
+  color: #000000 !important;
+  text-shadow: none !important;
+  box-shadow: 0 0 8px var(--glow-color), 0 0 14px var(--glow-color);
+  animation: var(--term-cursor-char-animation, cursor-char-blink 0.9s infinite);
+  border-radius: 1px;
 }
 
 /* Terminal Output line styles */

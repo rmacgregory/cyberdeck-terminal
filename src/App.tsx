@@ -753,10 +753,12 @@ export default function App() {
     // Taxa de piscada do cursor: 0 = estático (solid / animation: none); > 0 = animado
     if (crtConfig.cursorBlinkRate === 0) {
       document.documentElement.style.setProperty('--term-cursor-animation', 'none');
+      document.documentElement.style.setProperty('--term-cursor-char-animation', 'none');
       document.documentElement.style.setProperty('--term-cursor-blink-rate', '0s');
     } else {
       const rate = crtConfig.cursorBlinkRate ?? 1.4;
       document.documentElement.style.setProperty('--term-cursor-animation', `cursor-blink ${rate}s infinite`);
+      document.documentElement.style.setProperty('--term-cursor-char-animation', `cursor-char-blink ${rate}s infinite`);
       document.documentElement.style.setProperty('--term-cursor-blink-rate', `${rate}s`);
     }
 
