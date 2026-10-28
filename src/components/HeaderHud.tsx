@@ -37,6 +37,8 @@ interface HeaderHudProps {
   isDegaussing?: boolean;
   isSplitScreen?: boolean;
   onToggleSplitScreen?: () => void;
+  isMacrosOpen?: boolean;
+  onToggleMacros?: () => void;
 }
 
 const THEMES: { id: TerminalTheme; label: string; color: string; dotClass: string }[] = [
@@ -63,6 +65,8 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
   isDegaussing = false,
   isSplitScreen = false,
   onToggleSplitScreen,
+  isMacrosOpen = false,
+  onToggleMacros,
 }) => {
   const [clock, setClock] = useState<string>('00:00:00');
   const [isCrtMenuOpen, setIsCrtMenuOpen] = useState<boolean>(false);
@@ -172,6 +176,25 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
 
       {/* Controls - Always aligned to the right */}
       <div className="flex items-center justify-end gap-2 ml-auto flex-wrap">
+        {/* Quick Macros Ribbon Toggle */}
+        {onToggleMacros && (
+          <button
+            type="button"
+            onClick={onToggleMacros}
+            title={isMacrosOpen ? 'Ocultar barra de macros rápidas' : 'Exibir barra de macros rápidas (Ping, Port Scan, Htop, Nano)'}
+            className={`px-2 py-1 rounded border text-[11px] font-bold flex items-center gap-1 transition-all ${
+              isMacrosOpen
+                ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 shadow-[0_0_8px_rgba(0,240,255,0.4)]'
+                : 'border-zinc-700 bg-black/60 hover:bg-zinc-800 text-zinc-300'
+            }`}
+          >
+            <Radio className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">MACROS</span>
+          </button>
+        )}
+
+
+
         {/* Quick Degauss Button with Web Audio + Visual Jitter */}
         {onTriggerDegauss && (
           <button

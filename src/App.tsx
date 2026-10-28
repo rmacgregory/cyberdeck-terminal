@@ -31,7 +31,26 @@ import {
   loadPersistentCommandHistory,
   savePersistentCommandHistory,
 } from './utils/commandHistory';
-import { Terminal, Layers, Activity, Globe, Columns, X } from 'lucide-react';
+import { HtopModal } from './components/HtopModal';
+import { NanoEditorModal } from './components/NanoEditorModal';
+import { QuickMacrosBar } from './components/QuickMacrosBar';
+import {
+  executePortScan,
+  executeTraceroute,
+  downloadTerminalSessionLog,
+} from './utils/networkTools';
+import {
+  Terminal,
+  Layers,
+  Activity,
+  Globe,
+  Columns,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Split,
+  Copy,
+} from 'lucide-react';
 
 const WELCOME_BANNER = `
    ______      __              ____             __  
@@ -196,6 +215,69 @@ export default function App() {
   const [isSplitScreen, setIsSplitScreen] = useState<boolean>(false);
   const [splitLeftTabId, setSplitLeftTabId] = useState<string>('tab-1');
   const [splitRightTabId, setSplitRightTabId] = useState<string | null>(null);
+  const [splitOrientation, setSplitOrientation] = useState<'vertical' | 'horizontal'>('vertical');
+  const [isBroadcastMode, setIsBroadcastMode] = useState<boolean>(false);
+
+  // COLLAPSIBLE SIDEBAR STATE (Persistente)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('CYBERDECK_SIDEBAR_COLLAPSED') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('CYBERDECK_SIDEBAR_COLLAPSED', String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
+
+  // QUICK MACROS BAR STATE
+  const [isMacrosOpen, setIsMacrosOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('CYBERDECK_MACROS_OPEN') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('CYBERDECK_MACROS_OPEN', String(isMacrosOpen));
+  }, [isMacrosOpen]);
+
+  // HTOP PROCESS MONITOR STATE
+  const [isHtopOpen, setIsHtopOpen] = useState<boolean>(false);
+
+  // NANO TEXT EDITOR STATE
+  const [isNanoOpen, setIsNanoOpen] = useState<boolean>(false);
+  const [nanoFilename, setNanoFilename] = useState<string>('notas.txt');
+  const [nanoInitialContent, setNanoInitialContent] = useState<string>('');
+
+  const getVfsFiles = (): Record<string, string> => {
+    try {
+      const saved = localStorage.getItem('CYBERDECK_VFS');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      'notas.txt': '# Bloco de Notas Cyberdeck\n\n- [x] Terminal CRT configurado\n- [x] Split-screen ativo\n- [ ] Verificar firewall de borda (192.168.1.1)\n- [ ] Executar port scan nas sub-redes\n',
+      'hosts.conf': '127.0.0.1   localhost cyberdeck\n192.168.1.1 gateway.local router-cisco\n192.168.1.2 switch-core unifi\n8.8.8.8     dns.google\n',
+      'script.sh': '#!/bin/bash\necho "Iniciando teste de conectividade..."\nping 192.168.1.1\n',
+    };
+  };
+
+  const saveVfsFile = (name: string, content: string) => {
+    const files = getVfsFiles();
+    files[name] = content;
+    localStorage.setItem('CYBERDECK_VFS', JSON.stringify(files));
+    appendLine(`[VFS] Arquivo "${name}" gravado com sucesso (${content.length} bytes).`, 'success');
+  };
+
+  const handleOpenNano = (name = 'notas.txt') => {
+    const files = getVfsFiles();
+    const content = files[name] !== undefined ? files[name] : '';
+    setNanoFilename(name);
+    setNanoInitialContent(content);
+    setIsNanoOpen(true);
+  };
 
   // DEGAUSS (Desmagnetização da Bobina CRT) STATE
   const [isDegaussing, setIsDegaussing] = useState<boolean>(false);
@@ -631,11 +713,30 @@ export default function App() {
           handleSelectTab(tabs[idx].id);
         }
       }
+      // Alt + B -> Alternar recolhimento dos painéis laterais
+      if (e.altKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        setIsSidebarCollapsed((prev) => !prev);
+      }
+      // Alt + Seta Esquerda / Cima -> Focar Painel 1 no Split
+      if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')) {
+        if (isSplitScreen && leftTab) {
+          e.preventDefault();
+          handleSelectTab(leftTab.id);
+        }
+      }
+      // Alt + Seta Direita / Baixo ou Alt + P -> Focar Painel 2 no Split
+      if (e.altKey && (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key.toLowerCase() === 'p')) {
+        if (isSplitScreen && rightTab) {
+          e.preventDefault();
+          handleSelectTab(rightTab.id);
+        }
+      }
     };
 
     window.addEventListener('keydown', handleGlobalShortcuts);
     return () => window.removeEventListener('keydown', handleGlobalShortcuts);
-  }, [tabs]);
+  }, [tabs, isSplitScreen, leftTab, rightTab]);
 
   // Sincroniza dinamicamente as variáveis CSS de Brilho e Curvatura do Tubo CRT
   useEffect(() => {
@@ -962,7 +1063,7 @@ export default function App() {
   };
 
   // Command Execution Hub
-  const executeCommandLine = (rawCommand: string, targetTabId?: string) => {
+  const executeCommandLine = (rawCommand: string, targetTabId?: string, isBroadcastForward = false) => {
     const tabId = targetTabId || activeTabIdRef.current;
     const thisTab = tabsRef.current.find((t) => t.id === tabId) || currentTab;
     const socket = tabSocketsRef.current.get(tabId);
@@ -1012,6 +1113,19 @@ export default function App() {
     }
 
     if (!trimmed) return;
+
+    // Broadcast Mode: replicate command to the other split panel if active
+    if (isSplitScreen && isBroadcastMode && rightTab && !isBroadcastForward) {
+      const otherTabId = tabId === leftTab.id ? rightTab.id : leftTab.id;
+      const otherTab = tabsRef.current.find((t) => t.id === otherTabId);
+      if (otherTab) {
+        setTimeout(() => {
+          const prefix = getPromptPrefix(otherTab);
+          appendLineToTab(otherTabId, `${prefix} ${trimmed}`, 'cmd');
+          executeCommandLine(trimmed, otherTabId, true);
+        }, 50);
+      }
+    }
 
     // Record history persistently across reloads & in tab buffer
     const updatedHistory = savePersistentCommandHistory(trimmed);
@@ -1366,9 +1480,134 @@ export default function App() {
     }
 
     if (cmd === 'split' || cmd === 'dividir' || cmd === 'splitscreen') {
+      const sub = args[0]?.toLowerCase();
+      if (sub === 'horizontal' || sub === '-h' || sub === 'h') {
+        setSplitOrientation('horizontal');
+        if (!isSplitScreen) toggleSplitScreen();
+        appendLineToTab(tabId, '[*] Modo Split-Screen: Orientação HORIZONTAL (Terminais Acima / Abaixo)', 'success');
+        return;
+      }
+      if (sub === 'vertical' || sub === '-v' || sub === 'v') {
+        setSplitOrientation('vertical');
+        if (!isSplitScreen) toggleSplitScreen();
+        appendLineToTab(tabId, '[*] Modo Split-Screen: Orientação VERTICAL (Terminais Lado a Lado)', 'success');
+        return;
+      }
       toggleSplitScreen();
-      appendLine(
-        `[*] Modo Split-Screen: ${!isSplitScreen ? 'ATIVADO (Terminais lado a lado)' : 'DESATIVADO (Tela cheia)'}`,
+      appendLineToTab(
+        tabId,
+        `[*] Modo Split-Screen: ${!isSplitScreen ? 'ATIVADO' : 'DESATIVADO (Tela cheia)'}`,
+        'info'
+      );
+      appendLineToTab(tabId, 'Dica: Use "split -h" para divisão horizontal ou "split -v" para vertical.', 'dim');
+      return;
+    }
+
+    if (cmd === 'broadcast' || cmd === 'sync' || cmd === 'sincronizar') {
+      const sub = args[0]?.toLowerCase();
+      const next = sub === 'on' || sub === '1' ? true : sub === 'off' || sub === '0' ? false : !isBroadcastMode;
+      setIsBroadcastMode(next);
+      appendLineToTab(
+        tabId,
+        `[*] Broadcast Mode: ${next ? 'LIGADO (Comandos digitados executam nos dois terminais do split)' : 'DESLIGADO'}`,
+        next ? 'success' : 'info'
+      );
+      return;
+    }
+
+    if (cmd === 'htop' || cmd === 'top') {
+      setIsHtopOpen(true);
+      return;
+    }
+
+    if (cmd === 'nano' || cmd === 'edit' || cmd === 'notepad') {
+      const targetFile = args[0] || 'notas.txt';
+      handleOpenNano(targetFile);
+      return;
+    }
+
+    if (cmd === 'cat' || cmd === 'type') {
+      const targetFile = args[0];
+      if (!targetFile) {
+        appendLineToTab(tabId, 'Uso: cat <nome_do_arquivo> (ex: cat notas.txt)', 'warning');
+        return;
+      }
+      const files = getVfsFiles();
+      if (files[targetFile] !== undefined) {
+        appendLineToTab(tabId, `=== [ARQUIVO: ${targetFile}] ===`, 'info');
+        files[targetFile].split('\n').forEach((line) => {
+          appendLineToTab(tabId, line, 'stdout');
+        });
+      } else {
+        appendLineToTab(tabId, `cat: ${targetFile}: Arquivo não encontrado no Cyberdeck VFS. Crie com 'nano ${targetFile}'`, 'error');
+      }
+      return;
+    }
+
+    if (cmd === 'rm' || cmd === 'del') {
+      const targetFile = args[0];
+      if (!targetFile) {
+        appendLineToTab(tabId, 'Uso: rm <nome_do_arquivo>', 'warning');
+        return;
+      }
+      const files = getVfsFiles();
+      if (files[targetFile] !== undefined) {
+        delete files[targetFile];
+        localStorage.setItem('CYBERDECK_VFS', JSON.stringify(files));
+        appendLineToTab(tabId, `[*] Arquivo "${targetFile}" removido do Cyberdeck VFS.`, 'success');
+      } else {
+        appendLineToTab(tabId, `rm: ${targetFile}: Arquivo não encontrado.`, 'error');
+      }
+      return;
+    }
+
+    if (cmd === 'nmap' || cmd === 'scanport' || cmd === 'portscan') {
+      const targetHost = args[0] || '127.0.0.1';
+      addLog('CONNECT', 'SCAN', `Varredura de portas iniciada em ${targetHost}`, targetHost);
+      executePortScan(
+        targetHost,
+        (lineText, lineType) => appendLineToTab(tabId, lineText, lineType),
+        (openCount) => {
+          addLog('SUCCESS', 'SCAN', `Varredura finalizada em ${targetHost}: ${openCount} portas abertas`, targetHost);
+        }
+      );
+      return;
+    }
+
+    if (cmd === 'traceroute' || cmd === 'tracert' || cmd === 'mtr') {
+      const targetHost = args[0] || '8.8.8.8';
+      addLog('CONNECT', 'ICMP', `Traceroute iniciado para ${targetHost}`, targetHost);
+      executeTraceroute(
+        targetHost,
+        (lineText, lineType) => appendLineToTab(tabId, lineText, lineType),
+        () => {
+          addLog('SUCCESS', 'ICMP', `Traceroute para ${targetHost} finalizado com êxito`, targetHost);
+        }
+      );
+      return;
+    }
+
+    if (cmd === 'export' || cmd === 'savelog' || cmd === 'dumplog') {
+      downloadTerminalSessionLog(thisTab.title, thisTab.lines);
+      appendLineToTab(tabId, `[*] Histórico da aba "${thisTab.title}" exportado com sucesso para arquivo .log.`, 'success');
+      return;
+    }
+
+    if (cmd === 'sidebar' || cmd === 'paineis' || cmd === 'lateral') {
+      setIsSidebarCollapsed((prev) => !prev);
+      appendLineToTab(
+        tabId,
+        `[*] Painéis laterais: ${!isSidebarCollapsed ? 'RECOLHIDOS (Área do terminal maximizada)' : 'EXPANDIDOS'}`,
+        'info'
+      );
+      return;
+    }
+
+    if (cmd === 'macros') {
+      setIsMacrosOpen((prev) => !prev);
+      appendLineToTab(
+        tabId,
+        `[*] Barra de macros rápidas: ${!isMacrosOpen ? 'EXIBIDA' : 'OCULTA'}`,
         'info'
       );
       return;
@@ -1855,8 +2094,13 @@ export default function App() {
       appendLine('  d-----        22/10/2026  12:00 Desktop', 'stdout');
       appendLine('  d-----        22/10/2026  12:00 Documents', 'stdout');
       appendLine('  d-----        22/10/2026  12:00 Downloads', 'stdout');
-      appendLine('  -a----        22/10/2026  12:05 server-windows-terminal.js', 'success');
+      appendLine('  -a----        22/10/2026  12:05 server-terminal.js', 'success');
       appendLine('  -a----        22/10/2026  12:05 package.json', 'stdout');
+      const vfs = getVfsFiles();
+      Object.keys(vfs).forEach((fname) => {
+        const len = vfs[fname].length;
+        appendLine(`  -a----        28/10/2026  10:00 ${String(len).padStart(7, ' ')} ${fname}`, 'info');
+      });
       appendLine('');
       return;
     }
@@ -1944,14 +2188,32 @@ export default function App() {
     appendLine(`• telnet <host> [porta]    : Conexão direta TCP Socket Telnet (RFC 854) para switches/roteadores.`, 'stdout');
     appendLine(`• ping <host>              : Dispara teste de conectividade ICMP e latência.`, 'stdout');
     appendLine(`• ping-sweep <sub-rede/CIDR>: Varredura de sub-rede e detecção de dispositivos ativos.`, 'stdout');
+    appendLine(`• nmap / scanport <host>   : Varredura de portas abertas (SSH, Telnet, HTTP, MySQL...).`, 'stdout');
+    appendLine(`• traceroute / tracert <ip>: Rastreia os saltos de rede e tempos de resposta até o destino.`, 'stdout');
     appendLine(`• Tecla [TAB]              : Autocompleta comandos conforme o equipamento (Cisco, MikroTik, etc).`, 'success');
+    appendLine(``, 'stdout');
+    appendLine(`UTILITÁRIOS & ADMINISTRAÇÃO:`, 'warning');
+    appendLine(`• htop / top               : Monitor dinâmico de CPU (4 núcleos), RAM e tabela de processos.`, 'stdout');
+    appendLine(`• nano / edit <arquivo>    : Editor de texto retrô estilo GNU nano no terminal.`, 'stdout');
+    appendLine(`• cat / rm <arquivo>       : Exibe ou remove arquivos do Cyberdeck VFS.`, 'stdout');
+    appendLine(`• export / savelog         : Faz o download de todo o histórico da sessão em arquivo .log.`, 'stdout');
+    appendLine(`• split [-h | -v]          : Divide a tela na vertical (lado a lado) ou horizontal (cima/baixo).`, 'stdout');
+    appendLine(`• broadcast [on | off]     : Sincroniza a digitação nos dois terminais do split.`, 'stdout');
+    appendLine(`• sidebar                  : Recolhe ou expande os dois painéis laterais juntos.`, 'stdout');
+    appendLine(`• macros                   : Exibe ou oculta a barra de botões de macros rápidas.`, 'stdout');
+    appendLine(``, 'stdout');
+    appendLine(`ATALHOS DE TECLADO:`, 'warning');
+    appendLine(`• Alt + B                  : Recolhe / expande os painéis laterais (Maximiza o terminal).`, 'stdout');
+    appendLine(`• Alt + ← / ↑ / → / ↓      : Alterna o foco entre os terminais do Split-Screen.`, 'stdout');
+    appendLine(`• Alt + T | Alt + W        : Nova aba / Fechar aba ativa.`, 'stdout');
+    appendLine(`• Alt + 1..9               : Alterna entre abas abertas.`, 'stdout');
     appendLine(``, 'stdout');
     appendLine(`INTERPRETADORES DE SHELL:`, 'warning');
     appendLine(`• powershell / pwsh        : Alterna para o Windows PowerShell.`, 'stdout');
     appendLine(`• cmd                      : Alterna para o Prompt de Comando (CMD).`, 'stdout');
     appendLine(`• bash / zsh / sh          : Alterna para interpretador Unix/Linux/macOS.`, 'stdout');
     appendLine(``, 'stdout');
-    appendLine(`VISUAL & SISTEMA:`, 'warning');
+    appendLine(`VISUAL & SISTEMA CRT:`, 'warning');
     appendLine(`• cursor [solid|0.5s|slow] : Controla a taxa de piscada (blink rate) do cursor.`, 'stdout');
     appendLine(`• brightness <70-200>      : Ajusta o brilho da tela de fósforo CRT.`, 'stdout');
     appendLine(`• curve <0-100|off>        : Configura a curvatura esférica do tubo CRT.`, 'stdout');
@@ -2132,6 +2394,8 @@ export default function App() {
         isDegaussing={isDegaussing}
         isSplitScreen={isSplitScreen}
         onToggleSplitScreen={toggleSplitScreen}
+        isMacrosOpen={isMacrosOpen}
+        onToggleMacros={() => setIsMacrosOpen((prev) => !prev)}
       />
 
       {/* Terminal Multi-Tabs Bar */}
@@ -2144,6 +2408,23 @@ export default function App() {
         onCloseTab={handleCloseTab}
         onRenameTab={handleRenameTab}
       />
+
+      {/* Quick Action Macros Ribbon */}
+      {isMacrosOpen && (
+        <div className="my-1">
+          <QuickMacrosBar
+            onExecuteCommand={(cmd) => executeCommandLine(cmd, activeTabId)}
+            onOpenHtop={() => setIsHtopOpen(true)}
+            onOpenNano={(file) => handleOpenNano(file)}
+            onExportLog={() => downloadTerminalSessionLog(currentTab.title, currentTab.lines)}
+            isSplitScreen={isSplitScreen}
+            isBroadcastMode={isBroadcastMode}
+            onToggleBroadcast={() => setIsBroadcastMode((prev) => !prev)}
+            onToggleSplitLayout={() => setSplitOrientation((prev) => (prev === 'vertical' ? 'horizontal' : 'vertical'))}
+            splitOrientation={splitOrientation}
+          />
+        </div>
+      )}
 
       {/* Mobile Tab Switcher */}
       <div className="flex lg:hidden items-center gap-1 my-1 font-mono text-[11px] shrink-0">
@@ -2190,11 +2471,17 @@ export default function App() {
       </div>
 
       {/* Center Body: Terminal Workspace with Inline Typing + Right Sidebar */}
-      <div className="relative flex-1 flex flex-col lg:flex-row gap-3 min-h-0 mt-1">
+      <div className="relative flex-1 flex flex-col lg:flex-row gap-2 min-h-0 mt-1">
         {/* Main Terminal Screen or Split-Screen Dual Panes */}
         <div className={`flex-1 flex flex-col min-h-0 ${mobileTab === 'terminal' ? 'flex' : 'hidden lg:flex'}`}>
           {isSplitScreen && rightTab ? (
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 min-h-0">
+            <div
+              className={`flex-1 grid gap-2.5 min-h-0 ${
+                splitOrientation === 'horizontal'
+                  ? 'grid-cols-1 grid-rows-2'
+                  : 'grid-cols-1 md:grid-cols-2'
+              }`}
+            >
               {/* Left Pane (Painel 1) */}
               <div
                 onClick={() => handleSelectTab(leftTab.id)}
@@ -2235,6 +2522,23 @@ export default function App() {
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    {isBroadcastMode && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-mono tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/50 flex items-center gap-1 animate-pulse">
+                        <Copy className="w-2.5 h-2.5" />
+                        SYNC
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSplitOrientation((prev) => (prev === 'vertical' ? 'horizontal' : 'vertical'));
+                      }}
+                      className="p-1 rounded text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 transition-colors"
+                      title={splitOrientation === 'vertical' ? 'Mudar para divisão horizontal' : 'Mudar para divisão vertical'}
+                    >
+                      <Split className={`w-3.5 h-3.5 ${splitOrientation === 'horizontal' ? 'rotate-90 text-cyan-400' : ''}`} />
+                    </button>
                     <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-black/40 border border-current opacity-70">
                       {leftTab.protocol}
                     </span>
@@ -2317,6 +2621,23 @@ export default function App() {
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    {isBroadcastMode && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-mono tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/50 flex items-center gap-1 animate-pulse">
+                        <Copy className="w-2.5 h-2.5" />
+                        SYNC
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSplitOrientation((prev) => (prev === 'vertical' ? 'horizontal' : 'vertical'));
+                      }}
+                      className="p-1 rounded text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 transition-colors"
+                      title={splitOrientation === 'vertical' ? 'Mudar para divisão horizontal' : 'Mudar para divisão vertical'}
+                    >
+                      <Split className={`w-3.5 h-3.5 ${splitOrientation === 'horizontal' ? 'rotate-90 text-cyan-400' : ''}`} />
+                    </button>
                     <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-black/40 border border-current opacity-70">
                       {rightTab.protocol}
                     </span>
@@ -2391,35 +2712,61 @@ export default function App() {
           )}
         </div>
 
-        {/* Sidebar: Quick Sessions + Real-Time Connection Logs */}
-        <aside
-          className={`w-full lg:w-80 flex-col gap-3 shrink-0 min-h-0 ${
-            mobileTab === 'terminal' ? 'hidden lg:flex' : 'flex'
-          }`}
-        >
-          {/* Quick Sessions Panel */}
-          <div className={`${mobileTab === 'sessions' ? 'flex flex-col flex-1' : mobileTab === 'logs' ? 'hidden lg:block' : 'block'}`}>
-            <QuickSessionsPanel
-              sessions={sessions}
-              onSelectSession={(sess) => handleSelectQuickSession(sess, false)}
-              onSelectSessionInNewTab={(sess) => handleSelectQuickSession(sess, true)}
-              onOpenAddModal={() => setIsAddModalOpen(true)}
-              onDeleteSession={handleDeleteSession}
-            />
-          </div>
+        {/* Sleek Ultra-Thin Divider & Arrow Tab to Collapse/Expand Sidebars (Desktop) */}
+        <div className="hidden lg:flex flex-col items-center justify-center shrink-0 w-2.5 self-stretch relative group z-20">
+          {/* Subtle vertical hairline running through the division */}
+          <div className="absolute inset-y-1 left-1/2 -translate-x-1/2 w-px bg-zinc-800/80 group-hover:bg-cyan-500/40 transition-colors pointer-events-none" />
 
-          {/* Real-time Connection Log */}
-          <div className={`${mobileTab === 'logs' ? 'flex flex-col flex-1' : mobileTab === 'sessions' ? 'hidden lg:flex lg:flex-1' : 'flex flex-col flex-1'}`}>
-            <ConnectionLogsPanel logs={logs} onClear={() => setLogs([])} />
-          </div>
-        </aside>
+          {/* Slim Arrow Tab */}
+          <button
+            type="button"
+            onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+            className="relative z-10 w-2.5 h-14 flex items-center justify-center rounded-sm bg-black/90 hover:bg-zinc-900 border border-zinc-800/90 hover:border-cyan-400 text-zinc-500 hover:text-cyan-300 transition-all cursor-pointer shadow-sm group-hover:scale-105"
+            title={
+              isSidebarCollapsed
+                ? 'Expandir painéis laterais (Sessões e Logs) [Alt+B]'
+                : 'Recolher os dois painéis laterais (Maximizar área do terminal) [Alt+B]'
+            }
+          >
+            {isSidebarCollapsed ? (
+              <ChevronLeft className="w-2.5 h-2.5 stroke-[2.5]" />
+            ) : (
+              <ChevronRight className="w-2.5 h-2.5 stroke-[2.5]" />
+            )}
+          </button>
+        </div>
+
+        {/* Sidebar: Quick Sessions + Real-Time Connection Logs */}
+        {!isSidebarCollapsed && (
+          <aside
+            className={`w-full lg:w-80 flex-col gap-3 shrink-0 min-h-0 ${
+              mobileTab === 'terminal' ? 'hidden lg:flex' : 'flex'
+            }`}
+          >
+            {/* Quick Sessions Panel */}
+            <div className={`${mobileTab === 'sessions' ? 'flex flex-col flex-1' : mobileTab === 'logs' ? 'hidden lg:block' : 'block'}`}>
+              <QuickSessionsPanel
+                sessions={sessions}
+                onSelectSession={(sess) => handleSelectQuickSession(sess, false)}
+                onSelectSessionInNewTab={(sess) => handleSelectQuickSession(sess, true)}
+                onOpenAddModal={() => setIsAddModalOpen(true)}
+                onDeleteSession={handleDeleteSession}
+              />
+            </div>
+
+            {/* Real-time Connection Log */}
+            <div className={`${mobileTab === 'logs' ? 'flex flex-col flex-1' : mobileTab === 'sessions' ? 'hidden lg:flex lg:flex-1' : 'flex flex-col flex-1'}`}>
+              <ConnectionLogsPanel logs={logs} onClear={() => setLogs([])} />
+            </div>
+          </aside>
+        )}
       </div>
 
       {/* Bottom Hardware Footer */}
       <footer className="mt-2 pt-1 border-t border-zinc-900 flex flex-wrap items-center justify-between text-[10px] opacity-65 tracking-widest font-mono shrink-0">
         <div>TERMINAL: CROSS-PLATFORM // WIN • LINUX • MAC • ANDROID // ABA: {currentTab.title}</div>
         <div>PROTOCOLS: POWERSHELL • SSH • TELNET • ICMP • RAW TCP</div>
-        <div>ABAS ATIVAS: {tabs.length}{isSplitScreen ? ' [SPLIT-SCREEN ATIVO]' : ''}</div>
+        <div>ABAS ATIVAS: {tabs.length}{isSplitScreen ? ' [SPLIT-SCREEN ATIVO]' : ''}{isBroadcastMode ? ' [SYNC BROADCAST]' : ''}</div>
       </footer>
 
       {/* Modal to add new Quick Session */}
@@ -2440,6 +2787,22 @@ export default function App() {
           setIsBrowserOpen(false);
           executeCommandLine(cmd);
         }}
+      />
+
+      {/* Interactive Process Monitor Modal (HTOP) */}
+      <HtopModal
+        isOpen={isHtopOpen}
+        onClose={() => setIsHtopOpen(false)}
+        systemMetrics={systemMetrics || { cpu: 14, ramUsedMb: 6144, ramTotalMb: 16384, ramPercent: 38 }}
+      />
+
+      {/* Retro GNU Nano Text Editor Modal */}
+      <NanoEditorModal
+        isOpen={isNanoOpen}
+        filename={nanoFilename}
+        initialContent={nanoInitialContent}
+        onClose={() => setIsNanoOpen(false)}
+        onSaveFile={saveVfsFile}
       />
     </div>
   );
