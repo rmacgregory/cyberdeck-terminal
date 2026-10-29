@@ -26,74 +26,110 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
 * **Notificação de Fundo**: Indicadores visuais na barra de abas avisam quando uma sessão em segundo plano recebe novas saídas de dados.
 * **Gerenciamento Fácil**: Abra abas pelo botão `+ Nova Aba`, atalhos de teclado ou diretamente pelos comandos `tab new`, `tab close` e painel de Acessos Rápidos.
 
-### 🖥️ 2. Simulação CRT Avançada, Brilho, Curvatura, Jitter & Faixas de Hertz
+#### 🪟 2. Split-Screen (Divisão de Tela Lado a Lado ou Cima/Baixo) & Modo Broadcast
+* **Divisão de Tela Flexível**:
+  * Divida o espaço de trabalho em dois terminais ativos simultaneamente com orientação **Vertical** (`split -v`, lado a lado) ou **Horizontal** (`split -h`, cima e baixo).
+  * Botão de alternância rápida de orientação no topo dos terminais.
+* **Indicação Visual de Foco**:
+  * Borda destacada e indicadores luminosos (`EM FOCO (DIGITANDO AQUI)` vs `INATIVO — CLIQUE P/ FOCAR`) garantem que você sempre saiba exatamente em qual painel está digitando.
+* **Navegação por Teclado Entre Painéis**:
+  * Alterne o foco rapidamente usando `Alt + ←` / `Alt + ↑` (Painel 1) e `Alt + →` / `Alt + ↓` ou `Alt + P` (Painel 2).
+* **Modo Broadcast / Sincronizado (`broadcast on/off` ou `sync`)**:
+  * Quando ativado, os comandos digitados no painel ativo são transmitidos e executados em ambos os terminais simultaneamente — ideal para comparar saídas, atualizar múltiplos servidores ou monitorar logs em paralelo.
+
+### 📝 3. Editor de Texto Embutido Estilo GNU nano (`nano` / `edit`) & Sistema Virtual de Arquivos (VFS)
+* **Editor CRT em Tela Cheia**: Abra e edite scripts, arquivos de configuração ou anotações com o clássico visual retrô do GNU nano (`nano <arquivo>` ou `edit <arquivo>`).
+* **Numeração de Linhas & Atalhos Nativos**: Posição do cursor em tempo real, numeração de linhas, `Ctrl + S` para salvar e `Ctrl + X` para fechar.
+* **Armazenamento Persistente em VFS**: Arquivos salvos persistem no armazenamento local (`localStorage`), sobrevivendo a reinicializações.
+* **Comandos de Gerenciamento de Arquivos**:
+  * `cat <arquivo>`: Exibe o conteúdo de um arquivo virtual diretamente na tela do terminal.
+  * `rm <arquivo>`: Remove arquivos do sistema virtual.
+  * `ls` / `dir`: Lista os arquivos virtuais juntamente com as pastas e diretórios locais.
+
+### 📊 4. Monitor Interativo de Processos e CPU estilo HTOP (`htop` / `top`)
+* **Dashboard CRT com Telemetria Dinâmica**: Modal em tela cheia com medidores animados de uso de núcleos de CPU (`Core 1`, `Core 2`, etc.), memória RAM e Swap.
+* **Tabela de Processos Completa**: Lista detalhada com PID, Usuário, %CPU, %Memória, Prioridade e Nome do Processo.
+* **Filtro em Tempo Real & Ordenação**: Pesquisa rápida por nome/PID e reordenação instantânea por CPU, memória ou PID.
+* **Finalização de Processos**: Seleção de processos para envio de sinais de término (`SIGTERM` / `SIGKILL`).
+
+### 🔍 5. Diagnóstico Avançado de Rede: Nmap & Traceroute
+* **Scanner de Portas TCP (`nmap` / `scanport`)**:
+  * Varredura visual de portas comuns (SSH `22`, Telnet `23`, HTTP `80`, HTTPS `443`, MySQL `3306`, RDP `3389`, etc.) ou portas customizadas (`nmap 192.168.1.1` ou `scanport 10.0.0.1 80 443 8080`), com cálculo de latência e banners de serviço.
+* **Rastreador de Rota (`traceroute` / `tracert` / `mtr`)**:
+  * Traçado visual de saltos de rede (hops), cálculo individual de RTT em milissegundos e nós de tráfego (`traceroute 8.8.8.8` ou `mtr google.com`).
+
+### 💾 6. Exportação de Sessão & Auditoria de Logs (`export` / `savelog`)
+* **Download do Histórico Completo**: O comando `export` ou `savelog` gera instantaneamente um arquivo `.log` para download contendo o timestamp da sessão, comandos digitados e todas as saídas de texto formatadas.
+
+### ⚡ 7. Barra de Ações e Macros Rápidas (`Quick Macros Ribbon`)
+* **Execuções a Um Clique**: Barra retrátil no topo do terminal com atalhos para ações essenciais: *Ping GW*, *Scan /24*, *Nmap*, *Traceroute*, *Htop*, *Nano*, *Exportar Log*, *Limpar Tela* e *Modo Broadcast*.
+* **Controle Rápido**: Oculte ou exiba a barra pelo botão `[⚡ Macros]` no HUD ou pelo comando `macros`.
+
+### 🎛️ 8. Painéis Laterais Recolhíveis com Divisor Ultrafino & Área Máxima
+* **Lingueta Minimalista na Divisão**: Botão com micro-seta ultrafina localizado diretamente na linha divisória entre o terminal e as barras laterais.
+* **Maximização do Terminal**: Recolha as *Sessões Rápidas* e os *Logs de Conexão* juntos com 1 clique ou pelo atalho `Alt + B`, liberando 100% da largura da janela para o terminal. O estado recolhido é memorizado automaticamente entre recargas.
+
+### 🎯 9. Cursor Dinâmico CRT com Inversão de Caractere & Navegação Completa
+* **Navegação com Setas e Teclado**: O cursor do terminal agora caminha livremente entre as letras ao pressionar `←` (Seta Esquerda), `→` (Seta Direita), `Home`, `End` ou clicar com o mouse.
+* **Inversão Autêntica de Caractere CRT**: Ao posicionar o cursor sobre uma letra, o bloco de fósforo envolve o caractere invertendo suas cores (bloco brilhante com letra em preto no ciclo ativo), exatamente como em terminais analógicos clássicos (VT100/xterm).
+* **Edição no Meio da Linha**: Apague ou insira novos caracteres em qualquer posição do comando com acompanhamento visual imediato.
+
+### 🧲 10. Efeito de "Degauss" (Desmagnetização da Bobina do Tubo CRT)
+* **Choque Eletromagnético Analógico**: Efeito visual de clarão luminoso acompanhado de tremor transitório de desmagnetização da bobina catódica.
+* **Acionamento**: Botão `[⚡ DEGAUSS]` no HUD superior ou comando `degauss` no terminal.
+
+### 🖥️ 11. Simulação CRT Avançada, Pop-up Centralizado, Curvatura & Faixas de Hertz
+* **Painel de Opções CRT Centralizado**: O menu de opções agora abre como uma janela flutuante pop-up centralizada com abas organizadas (*Efeitos CRT*, *Varredura & Hertz*, *Tipografia*).
 * **Configurações Padrão Oficiais do Terminal**:
   * **Modo de Inicialização**: **CRT OFF** (abre em modo moderno, plano e de alto desempenho; ao ativar o filtro CRT, as seguintes configurações padrão calibradas são aplicadas instantaneamente).
   * **Brilho da Tela CRT**: **120%** (luminosidade reforçada para vivacidade óptica perfeita).
   * **Curvatura do Tubo CRT**: **Extremo (100%)** (máxima imersão física esférica de tubo catódico vintage).
   * **Intensidade da Vinheta**: **Suave (35%)** (escurecimento periférico suave que não esconde texto nos cantos).
   * **Brilho do Fósforo (Bloom)**: **Normal** (efeito de fósforo equilibrado para longa leitura sem cansar a visão).
-  * **Tremor do Tubo (Jitter)**: **Desligado (0%)** (estabilidade sólida do feixe de elétrons por padrão).
+  * **Tremor do Tubo (Jitter)**: Alternância Liga/Desliga com intensidade suave calibrada.
   * **Blink Rate do Cursor**: **Lento 15% (1.40s)** (cadência de piscada lenta, elegante e não intrusiva).
-  * **Faixas de Hertz (Varredura Analógica)**: **Ligado** com **Velocidade 15%**, **Largura das Faixas 100%** e **Transparência 5% Ultra Suave** (varredura contínua ampla, quase transparente e relaxante).
+  * **Faixas de Hertz (Varredura Analógica)**: **Ligado** com **Velocidade 15%**, **Largura das Faixas 100%** e **Transparência 5% Ultra Suave**.
   * **Grade de Fósforo (Scanlines & Aperture Grille)**: **Desativada por padrão** (nitidez e leitura cristalina).
   * **Phosphor Persistence (Ghosting / Persistência do Fósforo)**: **Ativado no modo CRT Real** (decaimento analógico de ~450ms nos caracteres).
 * **Phosphor Persistence (Ghosting Analógico do Fósforo)**: Simulação física da lenta dissipação luminosa dos elétrons em tubos CRT reais (fósforos P1 Green e P3 Amber):
-  * **Decaimento Suave de Caracteres**: Caracteres apagados, alterados ou removidos via backspace persistem por ~450 milissegundos em silhueta de afterglow antes de sumir completamente.
+  * **Decaimento Suave de Caracteres**: Caracteres apagados, alterados ou removidos via backspace persistem por ~450ms em silhueta de afterglow antes de sumir completamente.
   * **Decaimento ao Limpar a Tela (`clear` / `cls`)**: O conteúdo anterior decai suavemente na tela em 550ms em vez de cortar bruscamente a zero.
-  * **Botão Liga/Desliga no HUD**: Botão dedicado dentro do menu de configurações de tela CRT para ligar e desligar a qualquer momento.
-  * **Exclusividade do Modo CRT Real**: Este efeito funciona **estritamente quando o filtro CRT Real está ativado**. Nos modos **CRT Leve** e **CRT Off**, o efeito fica automaticamente desligado e com o botão bloqueado (`[INDISPONÍVEL]`), garantindo máxima fidelidade aos diferentes modos visuais.
+  * **Exclusividade do Modo CRT Real**: Ativo estritamente quando o filtro CRT Real está ligado.
   * **Comandos de Terminal**: `ghost on`, `ghost off`, `crt ghost`, `phosphor on/off`.
-* **Exibição Edge-to-Edge Limpa (Sem Moldura / Bezel)**: A antiga moldura industrial pesada de monitor foi removida, liberando 100% da área útil da janela em todos os modos, garantindo visual moderno e limpo sem obstruções visuais.
-* **Efeito das Faixas de Hertz (Varredura Analógica / Roll Bars Suaves & Quase Transparentes)**: Simulação refinada de interferência de frequência de rede (50Hz/60Hz AC hum e desincronização da taxa de varredura vertical) com passagem contínua de faixas luminosas ultra suaves e quase transparentes pela tela, preservando a legibilidade total do texto sem cansar a visão:
-  * **Transparência & Suavidade Calibradas**: Gradientes rebalanceados para serem quase transparentes (alfa ultra baixo de 2% a 5%), sem cortes pretos bruscos ou faixas agressivas.
-  * **Controle de Opacidade / Intensidade**: Ajustável de 0% (invisível) a 100% com slider e presets dedicados (*Ultra Suave 5%*, *Suave 15%*, *Padrão 35%*, *Marcada 60%*).
-  * **Velocidade de Passagem**: De 1% (varredura ultra lenta e relaxante de 15s) a 100% (flutter rápido de 0.5s). Padrão em 15%.
-  * **Largura das Faixas**: De 5% (linhas de feixe finas de 30px) a 100% (macrofaixas de interferência de 420px). Padrão em 100%.
-  * **Presets Rápidos**: *Ultra Suave (Padrão)*, *50Hz Drift*, *60Hz CRT Clássico* e *Interferência AC*.
-  * Comandos de Terminal: `hertz <velocidade> [largura]`, `hertz opacity <0-100>`, `hertz speed <1-100>`, `hertz width <5-100>`, `hertz suave`, `hertz 60hz`, `hertz off/on`.
-* **Tremor da Imagem (Jitter do Tubo CRT)**: Animação CSS de instabilidade aleatória do canhão de elétrons ajustável de 0% (imagem estável) a 100% (caos vintage), configurável pelo HUD ou comando `jitter <0-100|off>`.
-* **Controle Dinâmico de Brilho**: Ajuste fino da luminosidade do monitor CRT de 70% a 200% via slider na interface ou comando `brightness <valor>`.
-* **Curvatura do Tubo Regulável**: Intensidade da distorção esférica ajustável de 0% (plano total) até 100% (tubo esférico vintage acentuado) via slider ou comando `curve <0-100>`.
-* **Intensidade da Vinheta**: Controle óptico do escurecimento das bordas (0% desligado até 100% escuro) com presets rápidos no HUD e comando `vinheta <0-100|off>`.
-* **Taxa de Piscada do Cursor (Blink Rate)**: Controle no HUD com preview ao vivo, suportando modo fixo/estático (`solid`), lento, normal ou turbo (comando `cursor <solid|0.5s|turbo>`).
-* **Configurações Unificadas de Tela & Tipografia**: Fontes, tamanhos e espaçamento agora acessíveis diretamente dentro do menu de configurações CRT.
-* **Brilho de Fósforo & Bloom Intenso**: Efeito de irradiação de luz nos caracteres (`Extreme`, `Normal`, `Soft`).
-* **Linhas de Varredura (Scanlines & Aperture Grille)**: Efeito clássico de tubo de raios catódicos com subpixels RGB analógicos (desativada por padrão para máxima nitidez).
-* **4 Temas de Cores de Fósforo**:
-  * 🟢 **Matrix Green**: O lendário verde fósforo P1 (#00ff66).
-  * 🟡 **Amber CRT**: Fósforo âmbar clássico de estações industriais (#ffb000).
-  * 🔵 **Neo Cyan**: Azul ciberpunk de alta visibilidade (#00f0ff).
-  * 🟣 **Synthwave Magenta**: Rosa néon retrô (#ff0077).
-* **Tipografia Customizável**:
-  * Fontes: *Share Tech Mono*, *VT323 (DEC VT220)*, *Fira Code* e *JetBrains Mono*.
-  * Controle de escala (*Pequena*, *Média*, *Grande*) e espaçamento entre linhas (*Compacto*, *Normal*, *Espaçado*).
+* **Exibição Edge-to-Edge Limpa (Sem Moldura / Bezel)**: Área útil 100% livre em todos os modos.
+* **Efeito das Faixas de Hertz (Varredura Analógica / Roll Bars)**: Passagem de faixas luminosas quase transparentes com opacidade ajustável de 0% a 100%, largura de feixe e velocidade reguláveis. Comandos: `hertz <vel> [largura]`, `hertz suave`, `hertz 60hz`, `hertz off/on`.
+* **Tremor da Imagem (Jitter do Tubo CRT)**: Animação CSS de instabilidade do canhão de elétrons, ajustável via pop-up de opções ou comando `jitter on/off`.
+* **Controle Dinâmico de Brilho**: Ajuste fino da luminosidade de 70% a 200% (`brightness <valor>`).
+* **Curvatura do Tubo Regulável**: Distorção esférica ajustável de 0% a 100% (`curve <0-100>`).
+* **Intensidade da Vinheta**: Controle óptico do escurecimento das bordas (`vinheta <0-100|off>`).
+* **Taxa de Piscada do Cursor (Blink Rate)**: Modo fixo/estático (`solid`), lento, normal ou rápido (`cursor <solid|0.5s|turbo>`).
+* **4 Temas de Cores de Fósforo**: 🟢 *Matrix Green*, 🟡 *Amber CRT*, 🔵 *Neo Cyan*, 🟣 *Synthwave Magenta*.
+* **Tipografia Customizável**: *Share Tech Mono*, *VT323 (DEC VT220)*, *Fira Code* e *JetBrains Mono*, com tamanhos e espaçamentos reguláveis.
 
-### 📊 3. Telemetria Real do Sistema (CPU & Memória RAM)
-* **Monitoramento Real em Tempo Real**: O terminal lê o uso real de CPU e memória RAM do computador em que está rodando diretamente via Node.js (`os.cpus()`, `os.totalmem()`, `os.freemem()`).
-* **Exibição no HUD Superior**: Acompanhe o consumo do hardware enquanto executa comandos pesados ou administra servidores.
+### 📊 12. Telemetria Real do Sistema (CPU & Memória RAM)
+* **Monitoramento em Tempo Real**: Leitura do consumo real de hardware diretamente via Node.js (`os.cpus()`, `os.totalmem()`, `os.freemem()`).
+* **Exibição no HUD Superior**: Acompanhe o consumo da máquina com métricas de CPU e memória.
 
-### 🌐 4. Cyber-Net: Navegador Web CRT Embutido *(ALPHA - Em Testes ⚠️)*
-> ⚠️ **Status Alpha / Experimental**: A função de navegador integrado está em estágio inicial (Alpha) e possui bugs conhecidos. Muitos sites modernos utilizam proteções rígidas de incorporação (`X-Frame-Options`, CSP estrito e bloqueios de script) que impedem seu carregamento completo ou causam comportamentos imprevistos. O suporte e contorno dessas restrições estão sendo melhorados a cada versão.
-* Navegue na web sem sair da interface do Cyberdeck!
-* **Efeito CRT em tempo real sobre a web**: A tela do navegador herda a curvatura, o tom de fósforo e as scanlines.
+### 🌐 13. Cyber-Net: Navegador Web CRT Embutido *(ALPHA - Em Testes ⚠️)*
+> ⚠️ **Status Alpha / Experimental**: A função de navegador integrado está em estágio inicial (Alpha). Muitos sites modernos possuem proteções contra incorporação (`X-Frame-Options`, CSP).
+* Navegação web com efeito CRT aplicado em tempo real.
 * Comandos rápidos: `browser <url>` ou `youtube <id_ou_link>`.
 
-### ⚡ 5. Terminal Real & Multi-Shell
+### ⚡ 14. Terminal Real & Multi-Shell
 * Suporte nativo a diferentes interpretadores de comando:
   * **Windows**: PowerShell (`pwsh`) e Prompt de Comando (`cmd.exe`).
   * **Linux / macOS**: Bash (`/bin/bash`), Zsh (`/bin/zsh`) e POSIX Shell (`/bin/sh`).
 * Comunicação bidirecional contínua de baixa latência via **WebSockets (porta 3001)**.
-* No modo Desktop (Electron), o servidor backend é iniciado automaticamente em segundo plano.
+* Histórico de comandos com persistência (`ArrowUp` / `ArrowDown`).
 
-### 📡 6. Protocolos de Rede, Chaves SSH & Autocompletação Inteligente
-* **Varredura de Sub-rede ICMP (Ping-Sweep)**: Comando `ping-sweep <sub-rede/CIDR>` (ex: `ping-sweep 192.168.1.0/24`, `10.0.0.0/24`, `172.16.1.0/24`) para descobrir e mapear todos os dispositivos ativos da rede local em tempo real, exibindo tabela formatada com status `[ONLINE]`, IP, tempo de resposta (RTT em ms), identificação de hardware e endereço MAC, com resumo estatístico ao final.
-* **SSH Integrado com Chaves Privadas (PEM / OpenSSH / RSA / Ed25519)**: Conexão direta por senha ou arquivo de chave (`ssh -i chave.pem usuario@host -p 22`) e leitor de arquivos no modal de conexões rápidas.
-* **Autocompletação por Equipamento (`[TAB]`)**: O terminal detecta se você está conectado a roteadores e switches (Cisco IOS, MikroTik RouterOS, Huawei VRP, Juniper JunOS) ou servidores (Linux/Windows) e autocompleta os comandos nativos do dispositivo.
-* **Telnet & Raw TCP Socket**: Conexões diretas de socket com dispositivos legados, BBS e consoles de infraestrutura (`telnet host porta`).
+### 📡 15. Protocolos de Rede, Chaves SSH & Autocompletação Inteligente
+* **Varredura de Sub-rede ICMP (Ping-Sweep)**: Comando `ping-sweep <sub-rede/CIDR>` (ex: `ping-sweep 192.168.1.0/24`) para mapeamento de dispositivos ativos com IP, RTT, fabricante e MAC.
+* **SSH Integrado com Chaves Privadas (PEM / OpenSSH / RSA / Ed25519)**: Conexão direta por senha ou arquivo de chave (`ssh -i chave.pem usuario@host -p 22`).
+* **Autocompletação por Equipamento (`[TAB]`)**: Detecção inteligente de comandos para Cisco IOS, MikroTik RouterOS, Huawei VRP, Juniper JunOS e servidores Linux/Windows.
+* **Telnet & Raw TCP Socket**: Conexões diretas de socket com dispositivos de rede legados (`telnet host porta`).
 * **Ping / ICMP Real**: Testes de alcance de pacotes e latência em milissegundos.
-* **Painel de Acessos Rápidos (Quick Sessions)**: Salve conexões frequentes com IP, porta, protocolo, tipo de equipamento e credenciais (senha ou chave privada). Opção de conectar direto na aba atual ou abrir automaticamente em uma nova aba!
-* **Auditoria de Logs em Tempo Real**: Telemetria detalhada de eventos de rede, pacotes TX/RX, conexões e comandos com filtros por nível (`INFO`, `WARN`, `ERROR`, `DATA`, `SUCCESS`).
+* **Painel de Acessos Rápidos (Quick Sessions)**: Salve conexões frequentes com IP, porta, credenciais e abertura na aba atual ou em nova aba.
+* **Auditoria de Logs em Tempo Real**: Telemetria detalhada de eventos de rede, pacotes e conexões com filtros por severidade (`INFO`, `WARN`, `ERROR`, `DATA`, `SUCCESS`).
 
 ---
 
@@ -152,6 +188,19 @@ Digite os comandos abaixo diretamente no prompt do Cyberdeck:
 
 | Comando / Atalho | Descrição |
 | :--- | :--- |
+| `split [-h\|-v]` | Ativa/desativa divisão de tela (horizontal `-h` ou vertical `-v`) |
+| `broadcast <on\|off>` ou `sync` | Liga/desliga modo sincronizado de digitação simultânea em ambos os terminais |
+| `htop` ou `top` | Abre o monitor interativo de processos e CPU estilo HTOP CRT |
+| `nano <arquivo>` ou `edit <arquivo>` | Abre o editor de texto estilo GNU nano com sistema virtual de arquivos |
+| `cat <arquivo>` | Exibe o conteúdo de um arquivo virtual do sistema na tela |
+| `rm <arquivo>` | Remove um arquivo virtual do sistema |
+| `nmap <host>` ou `scanport <host>` | Executa varredura de portas TCP no host indicado |
+| `traceroute <host>` ou `tracert <host>` | Traça a rota de pacotes e saltos de rede até o host de destino |
+| `ping-sweep <subrede/CIDR>` | Mapeia todos os hosts e equipamentos ativos na sub-rede (ex: `192.168.1.0/24`) |
+| `export` ou `savelog` | Exporta e baixa o histórico completo da sessão em arquivo `.log` |
+| `degauss` | Dispara o efeito de desmagnetização analógica da bobina do tubo CRT |
+| `macros` | Exibe ou oculta a barra de botões e macros rápidas de rede |
+| `sidebar` | Alterna o recolhimento das barras laterais (maximiza a largura do terminal) |
 | `help` | Exibe a lista completa de comandos e sintaxe de uso |
 | `[TAB]` | Autocompleta comandos de acordo com o equipamento conectado (Cisco, MikroTik, Linux, etc.) |
 | `systeminfo` | Exibe dados do sistema operacional, host e arquitetura (x64) |
@@ -175,6 +224,24 @@ Digite os comandos abaixo diretamente no prompt do Cyberdeck:
 | `telnet <host> <porta>` | Abre um socket TCP Telnet/Raw |
 | `ping <host>` | Dispara testes de latência ICMP |
 | `clear` ou `cls` | Limpa a tela da aba atual |
+
+### ⌨️ Atalhos de Teclado Globais
+
+| Atalho | Ação |
+| :--- | :--- |
+| `Alt + B` | Recolhe / expande ambos os painéis laterais (área máxima para o terminal) |
+| `Alt + ←` ou `Alt + ↑` | Alterna o foco para o **Painel 1** no modo Split-Screen |
+| `Alt + →` ou `Alt + ↓` / `Alt + P` | Alterna o foco para o **Painel 2** no modo Split-Screen |
+| `Alt + T` | Cria e abre uma nova aba de terminal |
+| `Alt + W` | Fecha a aba de terminal ativa |
+| `Alt + 1` até `Alt + 9` | Alterna diretamente para a aba de número correspondente |
+| `←` / `→` (Setas) | Movimenta o cursor bloco CRT dinamicamente caractere por caractere |
+| `Home` / `End` | Salta o cursor diretamente para o início ou fim da linha de comando |
+| `↑` / `↓` (Setas) | Navega pelo histórico persistente de comandos executados |
+| `Ctrl + C` | Envia interrupção (^C) ou encerra a sessão remota ativa |
+| `Ctrl + L` | Limpa o buffer de linhas do terminal |
+| `Ctrl + S` | Salva o arquivo no editor de texto GNU nano |
+| `Ctrl + X` | Fecha o editor de texto GNU nano |
 
 ---
 
