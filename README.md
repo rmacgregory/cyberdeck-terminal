@@ -142,6 +142,11 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
 
 ### 📡 16. Protocolos de Rede, Chaves SSH & Autocompletação Inteligente
 * **Varredura de Sub-rede ICMP (Ping-Sweep)**: Comando `ping-sweep <sub-rede/CIDR>` (ex: `ping-sweep 192.168.1.0/24`) para mapeamento de dispositivos ativos com IP, RTT, fabricante e MAC.
+* **Mapa de Topologia de Rede em D3.js (Force-Directed Graph)**:
+  * Visualização gráfica em tempo real dos nós descobertos e suas interconexões de rede (Uplink 10Gbps, Fibra SFP+, Ethernet Cat6 e Wi-Fi 6).
+  * Simulação física com forças de repulsão/atração, nós arrastáveis (*drag and drop*), pan/zoom interativo e pulsos animados de pacotes de dados.
+  * Inspector lateral com detalhes de IP, MAC, latência, serviços ativos, portas abertas e atalho direto para conectar no terminal (`ssh <ip>` ou `ping <ip>`).
+  * Comandos de ativação no terminal: `topology`, `topologia`, `map`, `mapa`, além de botões dedicados no HUD superior (`MAPA D3`) e na barra de macros rápidas.
 * **SSH Integrado com Chaves Privadas (PEM / OpenSSH / RSA / Ed25519)**: Conexão direta por senha ou arquivo de chave (`ssh -i chave.pem usuario@host -p 22`).
 * **Autocompletação por Equipamento (`[TAB]`)**: Detecção inteligente de comandos para Cisco IOS, MikroTik RouterOS, Huawei VRP, Juniper JunOS e servidores Linux/Windows.
 * **Telnet & Raw TCP Socket**: Conexões diretas de socket com dispositivos de rede legados (`telnet host porta`).

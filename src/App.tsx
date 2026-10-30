@@ -36,11 +36,14 @@ import { HtopModal } from './components/HtopModal';
 import { NanoEditorModal } from './components/NanoEditorModal';
 import { QuickMacrosBar } from './components/QuickMacrosBar';
 import { MobileAccessoryBar } from './components/MobileAccessoryBar';
+import { NetworkTopologyModal } from './components/NetworkTopologyModal';
 import {
   executePortScan,
   executeTraceroute,
   downloadTerminalSessionLog,
+  generatePingSweepTopology,
 } from './utils/networkTools';
+import { PingSweepResult, NetworkNode } from './types';
 import {
   Terminal,
   Layers,
@@ -326,6 +329,21 @@ export default function App() {
   const [isNanoOpen, setIsNanoOpen] = useState<boolean>(false);
   const [nanoFilename, setNanoFilename] = useState<string>('notas.txt');
   const [nanoInitialContent, setNanoInitialContent] = useState<string>('');
+
+  // D3 NETWORK TOPOLOGY MAP STATE (from ping-sweep)
+  const [isTopologyOpen, setIsTopologyOpen] = useState<boolean>(false);
+  const [topologyData, setTopologyData] = useState<PingSweepResult | null>(() => {
+    return generatePingSweepTopology('192.168.1.0/24');
+  });
+
+  const handleOpenTopology = (customSubnet?: string) => {
+    if (customSubnet) {
+      setTopologyData(generatePingSweepTopology(customSubnet));
+    } else if (!topologyData) {
+      setTopologyData(generatePingSweepTopology('192.168.1.0/24'));
+    }
+    setIsTopologyOpen(true);
+  };
 
   const getVfsFiles = (): Record<string, string> => {
     try {
@@ -1922,6 +1940,14 @@ export default function App() {
       return;
     }
 
+    if (cmd === 'topology' || cmd === 'topologia' || cmd === 'map' || cmd === 'mapa' || cmd === 'netmap') {
+      const targetSubnet = args[0] || (topologyData ? topologyData.subnet : '192.168.1.0/24');
+      handleOpenTopology(args[0] ? targetSubnet : undefined);
+      appendLineToTab(tabId, `[*] Abrindo Mapa de Topologia de Rede D3.js para: ${targetSubnet}...`, 'success');
+      addLog('INFO', 'GUI', `Mapa de topologia D3 aberto para ${targetSubnet}`);
+      return;
+    }
+
     // Forward command to backend WebSocket if connected!
     if (currentTab.backendConnected && socket && socket.readyState === WebSocket.OPEN) {
       addLog('DATA', 'TX', `Comando enviado ao processo: ${trimmed}`);
@@ -2199,7 +2225,15 @@ export default function App() {
               `[i] Dica: Para conectar via console remoto, execute 'ssh ${prefix}1' ou 'telnet ${prefix}2'`,
               'stdout'
             );
-            addLog('SUCCESS', 'SCAN', `Ping-sweep finalizado em ${canonicalSubnet}: ${mockNodes.length} ativos`, canonicalSubnet);
+            appendLineToTab(
+              activeTab,
+              `[🌐] MAPA VISUAL D3.JS GERADO: Digite 'topology' ou 'map' para abrir o mapa interativo da sub-rede.`,
+              'success'
+            );
+            // Update D3 topology data with the freshly swept subnet nodes
+            const sweepResult = generatePingSweepTopology(canonicalSubnet);
+            setTopologyData(sweepResult);
+            addLog('SUCCESS', 'SCAN', `Ping-sweep finalizado em ${canonicalSubnet}: ${mockNodes.length} ativos (Grafo D3 pronto)`, canonicalSubnet);
           }, 160);
         }
       }, delay);
@@ -2334,6 +2368,7 @@ export default function App() {
     appendLine(`• telnet <host> [porta]    : Conexão direta TCP Socket Telnet (RFC 854) para switches/roteadores.`, 'stdout');
     appendLine(`• ping <host>              : Dispara teste de conectividade ICMP e latência.`, 'stdout');
     appendLine(`• ping-sweep <sub-rede/CIDR>: Varredura de sub-rede e detecção de dispositivos ativos.`, 'stdout');
+    appendLine(`• topology / map [sub-rede] : Mapa visual D3.js interativo de topologia dos nós descobertos.`, 'success');
     appendLine(`• nmap / scanport <host>   : Varredura de portas abertas (SSH, Telnet, HTTP, MySQL...).`, 'stdout');
     appendLine(`• traceroute / tracert <ip>: Rastreia os saltos de rede e tempos de resposta até o destino.`, 'stdout');
     appendLine(`• Tecla [TAB]              : Autocompleta comandos conforme o equipamento (Cisco, MikroTik, etc).`, 'success');
@@ -2710,6 +2745,7 @@ export default function App() {
         onToggleSplitScreen={toggleSplitScreen}
         isMacrosOpen={isMacrosOpen}
         onToggleMacros={() => setIsMacrosOpen((prev) => !prev)}
+        onOpenTopology={() => handleOpenTopology()}
       />
 
       {/* Terminal Multi-Tabs Bar */}
@@ -2736,6 +2772,7 @@ export default function App() {
             onToggleBroadcast={() => setIsBroadcastMode((prev) => !prev)}
             onToggleSplitLayout={() => setSplitOrientation((prev) => (prev === 'vertical' ? 'horizontal' : 'vertical'))}
             splitOrientation={splitOrientation}
+            onOpenTopology={() => handleOpenTopology()}
           />
         </div>
       )}
@@ -3235,6 +3272,21 @@ export default function App() {
         initialContent={nanoInitialContent}
         onClose={() => setIsNanoOpen(false)}
         onSaveFile={saveVfsFile}
+      />
+
+      {/* D3.js Network Topology Visualization Modal */}
+      <NetworkTopologyModal
+        isOpen={isTopologyOpen}
+        onClose={() => setIsTopologyOpen(false)}
+        data={topologyData}
+        theme={theme}
+        onConnectNode={(node) => {
+          if (node.type === 'gateway' || node.type === 'switch' || node.type === 'server') {
+            executeCommandLine(`ssh ${node.ip}`);
+          } else {
+            executeCommandLine(`ping ${node.ip}`);
+          }
+        }}
       />
     </div>
   );

@@ -22,6 +22,7 @@ interface QuickMacrosBarProps {
   onToggleBroadcast: () => void;
   onToggleSplitLayout: () => void;
   splitOrientation: 'vertical' | 'horizontal';
+  onOpenTopology?: () => void;
 }
 
 export const QuickMacrosBar: React.FC<QuickMacrosBarProps> = ({
@@ -34,6 +35,7 @@ export const QuickMacrosBar: React.FC<QuickMacrosBarProps> = ({
   onToggleBroadcast,
   onToggleSplitLayout,
   splitOrientation,
+  onOpenTopology,
 }) => {
   return (
     <div className="flex items-center gap-1.5 px-2 py-1 bg-black/60 border border-zinc-800/80 rounded font-mono text-[10px] overflow-x-auto cyber-scrollbar shrink-0 select-none">
@@ -61,6 +63,18 @@ export const QuickMacrosBar: React.FC<QuickMacrosBarProps> = ({
         <Network className="w-3 h-3 text-cyan-400" />
         SCAN /24
       </button>
+
+      {/* Topology Map D3 */}
+      {onOpenTopology && (
+        <button
+          onClick={onOpenTopology}
+          className="px-2 py-0.5 rounded bg-cyan-950/70 hover:bg-cyan-900 border border-cyan-500/60 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.3)] flex items-center gap-1 shrink-0 transition-colors cursor-pointer font-bold"
+          title="Abrir mapa interativo de topologia de rede D3.js"
+        >
+          <Network className="w-3 h-3 text-cyan-400 animate-pulse" />
+          MAPA TOPOLOGIA
+        </button>
+      )}
 
       {/* Port Scanner */}
       <button

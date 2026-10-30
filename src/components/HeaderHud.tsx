@@ -14,6 +14,7 @@ import {
   BatteryCharging,
   BatteryMedium,
   BatteryWarning,
+  Network,
 } from 'lucide-react';
 import {
   TerminalTheme,
@@ -45,6 +46,7 @@ interface HeaderHudProps {
   onToggleSplitScreen?: () => void;
   isMacrosOpen?: boolean;
   onToggleMacros?: () => void;
+  onOpenTopology?: () => void;
 }
 
 const THEMES: { id: TerminalTheme; label: string; color: string; dotClass: string }[] = [
@@ -76,6 +78,7 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
   onToggleSplitScreen,
   isMacrosOpen = false,
   onToggleMacros,
+  onOpenTopology,
 }) => {
   const [clock, setClock] = useState<string>('00:00:00');
   const [internalBattery, setInternalBattery] = useState<BatteryStatus | null>(null);
@@ -361,6 +364,19 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
           >
             <Globe className={`w-3.5 h-3.5 text-current ${isBrowserOpen ? 'animate-spin' : ''}`} style={{ animationDuration: '8s' }} />
             <span className="tracking-wider">WEB</span>
+          </button>
+        )}
+
+        {/* D3.js Network Topology Map Button */}
+        {onOpenTopology && (
+          <button
+            type="button"
+            onClick={onOpenTopology}
+            title="Visualizar Mapa de Topologia de Rede D3.js dos resultados do ping-sweep"
+            className="px-2.5 py-1 rounded border border-cyan-500/70 bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.3)] text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+          >
+            <Network className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+            <span className="tracking-wider">MAPA D3</span>
           </button>
         )}
 

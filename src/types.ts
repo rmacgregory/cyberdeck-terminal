@@ -116,3 +116,35 @@ export interface TerminalTab {
   hasUnread?: boolean;
 }
 
+export interface NetworkNode {
+  id: string;
+  ip: string;
+  rtt: string;
+  rttMs: number;
+  name: string;
+  mac: string;
+  type: 'gateway' | 'switch' | 'server' | 'ap' | 'client' | 'printer' | 'iot' | 'camera';
+  status: 'online' | 'degraded' | 'offline';
+  role?: string;
+  services?: string[];
+  ports?: number[];
+  subnet?: string;
+}
+
+export interface NetworkLink {
+  source: string;
+  target: string;
+  bandwidth?: string;
+  latency?: string;
+  linkType?: 'ethernet' | 'fiber' | 'wifi' | 'uplink';
+}
+
+export interface PingSweepResult {
+  subnet: string;
+  timestamp: string;
+  totalScanned: number;
+  activeCount: number;
+  durationMs: number;
+  nodes: NetworkNode[];
+  links: NetworkLink[];
+}
