@@ -43,6 +43,22 @@
   --panel-border: rgba(255, 0, 119, 0.35);
 }
 
+[data-theme="white"] {
+  --glow-color: #f0f4f8;
+  --glow-color-dim: #94a3b8;
+  --glow-color-bg: rgba(240, 244, 248, 0.08);
+  --term-bg: #07090c;
+  --panel-border: rgba(240, 244, 248, 0.35);
+}
+
+[data-theme="red"] {
+  --glow-color: #ff2a3b;
+  --glow-color-dim: #a8101e;
+  --glow-color-bg: rgba(255, 42, 59, 0.08);
+  --term-bg: #0d0103;
+  --panel-border: rgba(255, 42, 59, 0.35);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -195,6 +211,26 @@ body[data-theme="magenta"] .crt-real-screen {
     rgba(18, 2, 13, 0.82) 65%,
     rgba(6, 1, 4, 0.98) 95%,
     #030002 100%
+  );
+}
+
+body[data-theme="white"] .crt-real-screen {
+  background: radial-gradient(
+    ellipse 95% 85% at 50% 50%,
+    rgba(24, 28, 36, 0.45) 0%,
+    rgba(12, 14, 18, 0.82) 65%,
+    rgba(4, 5, 7, 0.98) 95%,
+    #020203 100%
+  );
+}
+
+body[data-theme="red"] .crt-real-screen {
+  background: radial-gradient(
+    ellipse 95% 85% at 50% 50%,
+    rgba(36, 6, 8, 0.45) 0%,
+    rgba(18, 2, 3, 0.82) 65%,
+    rgba(6, 1, 1, 0.98) 95%,
+    #030000 100%
   );
 }
 
@@ -653,6 +689,14 @@ body[data-theme="magenta"] .crt-real-screen {
   background: radial-gradient(circle at center, rgba(255, 255, 255, 0.85) 0%, rgba(0, 240, 255, 0.4) 30%, rgba(255, 0, 128, 0.3) 60%, transparent 90%);
   mix-blend-mode: color-dodge;
   animation: crt-degauss-flash-decay 1.75s ease-out forwards;
+}
+
+/* Android & Mobile Portrait Safe Area insets */
+.safe-area-top {
+  padding-top: max(0.25rem, env(safe-area-inset-top));
+}
+.safe-area-bottom {
+  padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
 }
 
 @keyframes crt-degauss-flash-decay {

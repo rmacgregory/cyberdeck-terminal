@@ -1,4 +1,4 @@
-export type TerminalTheme = 'green' | 'amber' | 'cyan' | 'magenta';
+export type TerminalTheme = 'green' | 'amber' | 'cyan' | 'magenta' | 'white' | 'red';
 
 export type LineType = 'stdout' | 'dim' | 'error' | 'warning' | 'info' | 'success' | 'cmd';
 
@@ -69,6 +69,13 @@ export interface SystemMetrics {
   ramPercent: number;
   cores?: number;
   uptime?: number;
+}
+
+export interface BatteryStatus {
+  level: number; // 0 a 100%
+  charging: boolean;
+  chargingTime?: number;
+  dischargingTime?: number;
 }
 
 export type TerminalFontSize = 'sm' | 'md' | 'lg';

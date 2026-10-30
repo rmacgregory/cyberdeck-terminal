@@ -17,6 +17,7 @@ import {
   TerminalFontFamily,
   TerminalTab,
   SystemMetrics,
+  BatteryStatus,
 } from './types';
 import { HeaderHud } from './components/HeaderHud';
 import { TerminalTabsBar } from './components/TerminalTabsBar';
@@ -34,6 +35,7 @@ import {
 import { HtopModal } from './components/HtopModal';
 import { NanoEditorModal } from './components/NanoEditorModal';
 import { QuickMacrosBar } from './components/QuickMacrosBar';
+import { MobileAccessoryBar } from './components/MobileAccessoryBar';
 import {
   executePortScan,
   executeTraceroute,
@@ -50,6 +52,8 @@ import {
   ChevronRight,
   Split,
   Copy,
+  Keyboard,
+  ArrowLeft,
 } from 'lucide-react';
 
 const WELCOME_BANNER = `
@@ -64,7 +68,15 @@ const WELCOME_BANNER = `
 =========================================================`;
 
 export default function App() {
-  const [theme, setTheme] = useState<TerminalTheme>('green');
+  const [theme, setTheme] = useState<TerminalTheme>(() => {
+    try {
+      const saved = localStorage.getItem('CYBERDECK_THEME') as TerminalTheme;
+      if (['green', 'amber', 'cyan', 'magenta', 'white', 'red'].includes(saved)) {
+        return saved;
+      }
+    } catch {}
+    return 'green';
+  });
   const [crtConfig, setCrtConfig] = useState<CrtConfig>(() => {
     let initialConfig: CrtConfig = {
       mode: 'off',
@@ -115,6 +127,42 @@ export default function App() {
   const [systemMetrics, setSystemMetrics] = useState<SystemMetrics | null>(null);
   const [mobileTab, setMobileTab] = useState<'terminal' | 'sessions' | 'logs'>('terminal');
 
+  // Battery Status State for Laptops and Portable Devices
+  const [batteryStatus, setBatteryStatus] = useState<BatteryStatus | null>(null);
+
+  useEffect(() => {
+    let batteryInstance: any = null;
+    const updateBattery = (b: any) => {
+      setBatteryStatus({
+        level: Math.round((b.level ?? 1) * 100),
+        charging: Boolean(b.charging),
+        chargingTime: b.chargingTime,
+        dischargingTime: b.dischargingTime,
+      });
+    };
+
+    if (typeof navigator !== 'undefined' && 'getBattery' in navigator) {
+      (navigator as any).getBattery().then((battery: any) => {
+        batteryInstance = battery;
+        updateBattery(battery);
+
+        battery.addEventListener('levelchange', () => updateBattery(battery));
+        battery.addEventListener('chargingchange', () => updateBattery(battery));
+        battery.addEventListener('chargingtimechange', () => updateBattery(battery));
+        battery.addEventListener('dischargingtimechange', () => updateBattery(battery));
+      }).catch(() => {});
+    }
+
+    return () => {
+      if (batteryInstance) {
+        try {
+          batteryInstance.removeEventListener('levelchange', () => updateBattery(batteryInstance));
+          batteryInstance.removeEventListener('chargingchange', () => updateBattery(batteryInstance));
+        } catch {}
+      }
+    };
+  }, []);
+
   // Integrated Cyber-Net Web Browser (Alpha)
   const [isBrowserOpen, setIsBrowserOpen] = useState<boolean>(false);
   const [browserInitialUrl, setBrowserInitialUrl] = useState<string>('cyberdeck://home');
@@ -126,27 +174,54 @@ export default function App() {
     }
     if (typeof navigator !== 'undefined') {
       const ua = navigator.userAgent.toLowerCase();
-      if (ua.includes('mac')) return 'darwin';
+      if (ua.includes('android')) return 'android';
+      if (ua.includes('mac') || ua.includes('iphone') || ua.includes('ipad')) return 'darwin';
       if (ua.includes('linux')) return 'linux';
       if (ua.includes('win')) return 'win32';
     }
     return 'win32';
   });
 
+  // Mobile & Portrait Orientation State for Smartphones and Handheld Cyberdecks
+  const [isMobileView, setIsMobileView] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 1024 || /android|iphone|ipad|mobile/i.test(navigator.userAgent);
+    }
+    return false;
+  });
+
+  const [isPortrait, setIsPortrait] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerHeight > window.innerWidth;
+    }
+    return false;
+  });
+
+  const [showMobileAccessoryBar, setShowMobileAccessoryBar] = useState<boolean>(true);
+
   const defaultShell = (() => {
     if (typeof window !== 'undefined' && (window as any).cyberdeckDesktop?.platform === 'darwin') return 'zsh';
     if (typeof window !== 'undefined' && (window as any).cyberdeckDesktop?.platform === 'linux') return 'bash';
+    if (typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('android')) return 'sh';
     return 'powershell';
   })();
 
   const defaultPath = (() => {
-    if (typeof navigator !== 'undefined' && (navigator.userAgent.includes('Mac') || navigator.userAgent.includes('Linux'))) {
-      return '~';
+    if (typeof navigator !== 'undefined') {
+      const ua = navigator.userAgent.toLowerCase();
+      if (ua.includes('mac') || ua.includes('linux') || ua.includes('android')) {
+        return '~';
+      }
     }
     return 'C:\\Users\\Admin';
   })();
 
-  const [systemInfoLabel, setSystemInfoLabel] = useState<string>('Local Host');
+  const [systemInfoLabel, setSystemInfoLabel] = useState<string>(() => {
+    if (typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('android')) {
+      return 'Android Terminal (Linux Kernel)';
+    }
+    return 'Local Host';
+  });
 
   // Backend URL (Node.js WebSocket Server)
   const [backendUrl, setBackendUrl] = useState<string>(() => {
@@ -295,6 +370,10 @@ export default function App() {
     setIsSplitScreen((prev) => {
       const next = !prev;
       if (next) {
+        // Automatically prefer horizontal (stacked) split when screen is in portrait/vertical mode
+        if (typeof window !== 'undefined' && window.innerHeight > window.innerWidth) {
+          setSplitOrientation('horizontal');
+        }
         // Left pane will take active tab
         const leftId = activeTabId;
         setSplitLeftTabId(leftId);
@@ -738,6 +817,25 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleGlobalShortcuts);
   }, [tabs, isSplitScreen, leftTab, rightTab]);
 
+  // Monitor mobile portrait/landscape changes and adapt layout dynamically
+  useEffect(() => {
+    const handleOrientationAndResize = () => {
+      const portrait = window.innerHeight > window.innerWidth;
+      setIsPortrait(portrait);
+      setIsMobileView(window.innerWidth < 1024 || /android|iphone|ipad|mobile/i.test(navigator.userAgent));
+      if (portrait && isSplitScreen && splitOrientation === 'vertical') {
+        setSplitOrientation('horizontal');
+      }
+    };
+
+    window.addEventListener('resize', handleOrientationAndResize);
+    window.addEventListener('orientationchange', handleOrientationAndResize);
+    return () => {
+      window.removeEventListener('resize', handleOrientationAndResize);
+      window.removeEventListener('orientationchange', handleOrientationAndResize);
+    };
+  }, [isSplitScreen, splitOrientation]);
+
   // Sincroniza dinamicamente as variáveis CSS de Brilho e Curvatura do Tubo CRT
   useEffect(() => {
     const brightnessVal = (crtConfig.brightness ?? 120) / 100;
@@ -834,6 +932,9 @@ export default function App() {
   // Update theme on body
   const handleThemeChange = (newTheme: TerminalTheme) => {
     setTheme(newTheme);
+    try {
+      localStorage.setItem('CYBERDECK_THEME', newTheme);
+    } catch {}
     document.body.setAttribute('data-theme', newTheme);
     appendLine(`[+] Paleta CRT atualizada para: ${newTheme.toUpperCase()}`, 'success');
     addLog('INFO', 'CONFIG', `Tema CRT alterado para ${newTheme.toUpperCase()}`);
@@ -1253,11 +1354,32 @@ export default function App() {
       return;
     }
 
-    if (cmd === 'theme') {
-      if (['green', 'amber', 'cyan', 'magenta'].includes(args[0]?.toLowerCase())) {
-        handleThemeChange(args[0].toLowerCase() as TerminalTheme);
+    if (cmd === 'theme' || cmd === 'tema' || cmd === 'fosforo') {
+      const rawTheme = args[0]?.toLowerCase();
+      const themeMap: Record<string, TerminalTheme> = {
+        green: 'green',
+        verde: 'green',
+        amber: 'amber',
+        ambar: 'amber',
+        cyan: 'cyan',
+        ciano: 'cyan',
+        blue: 'cyan',
+        azul: 'cyan',
+        magenta: 'magenta',
+        pink: 'magenta',
+        rosa: 'magenta',
+        white: 'white',
+        branco: 'white',
+        paper: 'white',
+        red: 'red',
+        vermelho: 'red',
+      };
+
+      if (rawTheme && themeMap[rawTheme]) {
+        handleThemeChange(themeMap[rawTheme]);
       } else {
-        appendLine('Uso: theme <green | amber | cyan | magenta>', 'warning');
+        appendLine('Uso: theme <green | amber | cyan | magenta | white | red>', 'warning');
+        appendLine('Cores de fósforo disponíveis: green (verde), amber (âmbar), cyan (ciano), magenta, white (branco), red (vermelho)', 'dim');
       }
       return;
     }
@@ -2165,6 +2287,28 @@ export default function App() {
       appendLine(`Interpretador Shell Atual:         ${currentTab.shellType.toUpperCase()}`, 'stdout');
       appendLine(`Diretório Atual:                   ${currentTab.currentPath}`, 'stdout');
       appendLine(`Backend:                           ${currentTab.backendConnected ? 'Conectado (ws://127.0.0.1:3001)' : 'Offline / Standalone'}`, 'stdout');
+      if (batteryStatus) {
+        appendLine(`Bateria / Alimentação:             ${batteryStatus.level}% [${batteryStatus.charging ? 'Carregando (Rede AC / USB-C)' : 'Bateria (Em Descarga)'}]`, batteryStatus.charging ? 'success' : batteryStatus.level <= 20 ? 'error' : 'stdout');
+      }
+      return;
+    }
+
+    if (cmd === 'battery' || cmd === 'bateria' || cmd === 'power' || cmd === 'energia') {
+      appendLine('=== TELEMETRIA DE ALIMENTAÇÃO // CYBERDECK POWER MGR ===', 'info');
+      if (batteryStatus) {
+        appendLine(`• Nível de Carga:         ${batteryStatus.level}%`, batteryStatus.level <= 20 ? 'error' : batteryStatus.level <= 50 ? 'warning' : 'success');
+        appendLine(`• Fonte de Energia:       ${batteryStatus.charging ? 'Rede Elétrica AC / Carregamento Ativo' : 'Bateria Interna (Descarga)'}`, 'stdout');
+        appendLine(`• Estado da Célula:       ${batteryStatus.charging ? 'CARREGANDO [⚡]' : 'EM USO (DESCARREGANDO)'}`, batteryStatus.charging ? 'success' : 'stdout');
+        if (!batteryStatus.charging && batteryStatus.dischargingTime && batteryStatus.dischargingTime !== Infinity) {
+          const mins = Math.round(batteryStatus.dischargingTime / 60);
+          appendLine(`• Autonomia Restante:     ~${mins} minutos (${(mins / 60).toFixed(1)} horas)`, 'info');
+        } else if (batteryStatus.charging && batteryStatus.chargingTime && batteryStatus.chargingTime > 0 && batteryStatus.chargingTime !== Infinity) {
+          appendLine(`• Tempo até Carga Total:  ~${Math.round(batteryStatus.chargingTime / 60)} minutos`, 'info');
+        }
+        appendLine(`• Sensor de Hardware:     Web Battery Status API / ACPI Battery Subsystem`, 'dim');
+      } else {
+        appendLine('Dispositivo estacionário ou sem bateria detectada (Alimentação Direta AC / Desktop).', 'dim');
+      }
       return;
     }
 
@@ -2223,11 +2367,12 @@ export default function App() {
     appendLine(`• jitter <0-100|off>       : Controla o nível de tremor/instabilidade da imagem CRT.`, 'stdout');
     appendLine(`• hertz <vel> [largura]    : Controla as faixas de varredura Hertz (50Hz/60Hz roll bar).`, 'stdout');
     appendLine(`• ghost [on|off]           : Ativa/desativa Phosphor Persistence (Ghosting) no modo CRT Real.`, 'stdout');
-    appendLine(`• theme [green|amber|cyan] : Altera paleta de fósforo da tela CRT.`, 'stdout');
+    appendLine(`• theme <green|amber|cyan|magenta|white|red> : Altera paleta de fósforo da tela CRT.`, 'stdout');
     appendLine(`• crt [real|leve|bloom|off]: Modos do tubo catódico, curvatura e brilho de fósforo.`, 'stdout');
     appendLine(`• font [family|size|space] : Tipografia CRT: 4 fontes, 3 tamanhos e espaçamentos.`, 'stdout');
     appendLine(`• browser / web <url>      : Abre navegador web integrado com efeito CRT (Alpha).`, 'stdout');
     appendLine(`• systeminfo               : Exibe arquitetura 64-bit, SO e telemetria de CPU/RAM.`, 'stdout');
+    appendLine(`• battery / power          : Telemetria de alimentação, nível de carga e status AC.`, 'stdout');
     appendLine(`• clear / cls              : Limpa a tela da aba atual.`, 'stdout');
     appendLine(`--------------------------------------------------------------------------------`, 'dim');
     appendLine(`Cadastre seus equipamentos no painel lateral [SESSÕES RÁPIDAS]!`, 'success');
@@ -2337,6 +2482,171 @@ export default function App() {
     }
   };
 
+  // VIRTUAL ACCESSORY BAR HANDLERS (Android / Mobile Soft Keyboards)
+  const handleVirtualInsertChar = (char: string) => {
+    const target = tabs.find((t) => t.id === activeTabId) || currentTab;
+    const activeInput = document.querySelector('main input:not([readonly])') as HTMLInputElement | null;
+    const curVal = target.inputValue;
+    let nextVal = curVal + char;
+    let newPos = nextVal.length;
+
+    if (activeInput && activeInput.selectionStart !== null && activeInput.selectionEnd !== null) {
+      const start = activeInput.selectionStart;
+      const end = activeInput.selectionEnd;
+      nextVal = curVal.slice(0, start) + char + curVal.slice(end);
+      newPos = start + char.length;
+    }
+
+    setTabs((prev) =>
+      prev.map((t) => (t.id === target.id ? { ...t, inputValue: nextVal } : t))
+    );
+
+    if (activeInput) {
+      activeInput.focus();
+      requestAnimationFrame(() => {
+        try {
+          activeInput.setSelectionRange(newPos, newPos);
+          activeInput.dispatchEvent(new Event('select', { bubbles: true }));
+        } catch {}
+      });
+    }
+  };
+
+  const handleVirtualTab = () => {
+    const target = tabs.find((t) => t.id === activeTabId) || currentTab;
+    const rawInput = target.inputValue;
+    const result = getEquipmentCompletions(rawInput, target);
+
+    if (result.completedText) {
+      setTabs((prev) =>
+        prev.map((t) => (t.id === target.id ? { ...t, inputValue: result.completedText! } : t))
+      );
+    }
+
+    if (result.suggestions.length > 0 && (!result.completedText || result.suggestions.length > 1)) {
+      appendLineToTab(
+        target.id,
+        `[TAB ${result.equipmentLabel}] ${result.suggestions.slice(0, 8).join('  •  ')}${
+          result.suggestions.length > 8 ? ' ...' : ''
+        }`,
+        'dim'
+      );
+    }
+
+    const activeInput = document.querySelector('main input:not([readonly])') as HTMLInputElement | null;
+    activeInput?.focus();
+  };
+
+  const handleVirtualArrowUp = () => {
+    const target = tabs.find((t) => t.id === activeTabId) || currentTab;
+    if (target.history.length === 0) return;
+    let newIdx = target.historyIndex === -1 ? target.history.length - 1 : target.historyIndex - 1;
+    if (newIdx < 0) newIdx = 0;
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === target.id
+          ? {
+              ...t,
+              historyIndex: newIdx,
+              inputValue: t.history[newIdx] || '',
+            }
+          : t
+      )
+    );
+  };
+
+  const handleVirtualArrowDown = () => {
+    const target = tabs.find((t) => t.id === activeTabId) || currentTab;
+    if (target.history.length === 0 || target.historyIndex === -1) return;
+    const newIdx = target.historyIndex + 1;
+    if (newIdx >= target.history.length) {
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === target.id
+            ? {
+                ...t,
+                historyIndex: -1,
+                inputValue: '',
+              }
+            : t
+        )
+      );
+    } else {
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === target.id
+            ? {
+                ...t,
+                historyIndex: newIdx,
+                inputValue: t.history[newIdx] || '',
+              }
+            : t
+        )
+      );
+    }
+  };
+
+  const handleVirtualArrowLeft = () => {
+    const target = tabs.find((t) => t.id === activeTabId) || currentTab;
+    const activeInput = document.querySelector('main input:not([readonly])') as HTMLInputElement | null;
+    if (activeInput) {
+      const start = activeInput.selectionStart ?? target.inputValue.length;
+      const next = Math.max(0, start - 1);
+      activeInput.focus();
+      activeInput.setSelectionRange(next, next);
+      activeInput.dispatchEvent(new Event('select', { bubbles: true }));
+    }
+  };
+
+  const handleVirtualArrowRight = () => {
+    const target = tabs.find((t) => t.id === activeTabId) || currentTab;
+    const activeInput = document.querySelector('main input:not([readonly])') as HTMLInputElement | null;
+    if (activeInput) {
+      const start = activeInput.selectionStart ?? 0;
+      const next = Math.min(target.inputValue.length, start + 1);
+      activeInput.focus();
+      activeInput.setSelectionRange(next, next);
+      activeInput.dispatchEvent(new Event('select', { bubbles: true }));
+    }
+  };
+
+  const handleVirtualEscape = () => {
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === activeTabId ? { ...t, inputValue: '', historyIndex: -1 } : t
+      )
+    );
+    const activeInput = document.querySelector('main input:not([readonly])') as HTMLInputElement | null;
+    activeInput?.focus();
+  };
+
+  const handleVirtualCtrlC = () => {
+    appendLineToTab(activeTabId, '^C', 'warning');
+    setTabs((prev) =>
+      prev.map((t) => (t.id === activeTabId ? { ...t, inputValue: '' } : t))
+    );
+    if (currentTab.sessionState === 'remote_session') {
+      exitRemoteSession('Interrompido via ^C', activeTabId);
+    }
+  };
+
+  const handleVirtualCtrlL = () => {
+    setTabs((prev) =>
+      prev.map((t) => (t.id === activeTabId ? { ...t, lines: [] } : t))
+    );
+  };
+
+  const handleVirtualEnter = () => {
+    const target = tabs.find((t) => t.id === activeTabId) || currentTab;
+    const current = target.inputValue;
+    setTabs((prev) =>
+      prev.map((t) => (t.id === target.id ? { ...t, inputValue: '' } : t))
+    );
+    const prefix = getPromptPrefix(target);
+    appendLineToTab(target.id, `${prefix} ${current}`, 'cmd');
+    executeCommandLine(current, target.id);
+  };
+
   const getPromptPrefix = (tab: TerminalTab = currentTab) => {
     if (tab.isPasswordInput) {
       return '';
@@ -2349,7 +2659,8 @@ export default function App() {
       tab.shellType === 'zsh' ||
       tab.shellType === 'sh' ||
       detectedPlatform === 'darwin' ||
-      detectedPlatform === 'linux'
+      detectedPlatform === 'linux' ||
+      detectedPlatform === 'android'
     ) {
       const formattedPath = tab.currentPath.replace(/^\/Users\/[^/]+|^\/home\/[^/]+/, '~');
       return `${tab.currentUsername}@cyberdeck:${formattedPath}$ `;
@@ -2390,6 +2701,7 @@ export default function App() {
         sessionState={currentTab.sessionState}
         backendConnected={currentTab.backendConnected}
         systemMetrics={systemMetrics}
+        batteryStatus={batteryStatus}
         isBrowserOpen={isBrowserOpen}
         onToggleBrowser={() => setIsBrowserOpen((prev) => !prev)}
         onTriggerDegauss={triggerDegauss}
@@ -2742,11 +3054,22 @@ export default function App() {
         {!isSidebarCollapsed && (
           <aside
             className={`w-full lg:w-80 flex-col gap-3 shrink-0 min-h-0 ${
-              mobileTab === 'terminal' ? 'hidden lg:flex' : 'flex'
+              mobileTab === 'terminal' ? 'hidden lg:flex' : 'flex flex-1'
             }`}
           >
             {/* Quick Sessions Panel */}
-            <div className={`${mobileTab === 'sessions' ? 'flex flex-col flex-1' : mobileTab === 'logs' ? 'hidden lg:block' : 'block'}`}>
+            <div className={`${mobileTab === 'sessions' ? 'flex flex-col flex-1 min-h-0' : mobileTab === 'logs' ? 'hidden lg:block' : 'block'}`}>
+              {/* Back to terminal button on mobile */}
+              <div className="lg:hidden mb-2">
+                <button
+                  type="button"
+                  onClick={() => setMobileTab('terminal')}
+                  className="w-full py-1.5 px-3 rounded bg-zinc-900 border border-zinc-700/80 hover:border-emerald-500 text-xs font-mono text-zinc-300 flex items-center justify-center gap-1.5 active:bg-zinc-800 cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>VOLTAR AO TERMINAL</span>
+                </button>
+              </div>
               <QuickSessionsPanel
                 sessions={sessions}
                 onSelectSession={(sess) => handleSelectQuickSession(sess, false)}
@@ -2757,15 +3080,122 @@ export default function App() {
             </div>
 
             {/* Real-time Connection Log */}
-            <div className={`${mobileTab === 'logs' ? 'flex flex-col flex-1' : mobileTab === 'sessions' ? 'hidden lg:flex lg:flex-1' : 'flex flex-col flex-1'}`}>
+            <div className={`${mobileTab === 'logs' ? 'flex flex-col flex-1 min-h-0' : mobileTab === 'sessions' ? 'hidden lg:flex lg:flex-1' : 'flex flex-col flex-1'}`}>
+              {/* Back to terminal button on mobile */}
+              <div className="lg:hidden mb-2">
+                <button
+                  type="button"
+                  onClick={() => setMobileTab('terminal')}
+                  className="w-full py-1.5 px-3 rounded bg-zinc-900 border border-zinc-700/80 hover:border-cyan-500 text-xs font-mono text-zinc-300 flex items-center justify-center gap-1.5 active:bg-zinc-800 cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>VOLTAR AO TERMINAL</span>
+                </button>
+              </div>
               <ConnectionLogsPanel logs={logs} onClear={() => setLogs([])} />
             </div>
           </aside>
         )}
       </div>
 
+      {/* Virtual Terminal Accessory Bar (Key Rail for Android / Mobile Soft Keyboards) */}
+      {showMobileAccessoryBar && mobileTab === 'terminal' && (
+        <div className="mt-1">
+          <MobileAccessoryBar
+            onInsertChar={handleVirtualInsertChar}
+            onTab={handleVirtualTab}
+            onArrowUp={handleVirtualArrowUp}
+            onArrowDown={handleVirtualArrowDown}
+            onArrowLeft={handleVirtualArrowLeft}
+            onArrowRight={handleVirtualArrowRight}
+            onEscape={handleVirtualEscape}
+            onCtrlC={handleVirtualCtrlC}
+            onCtrlL={handleVirtualCtrlL}
+            onEnter={handleVirtualEnter}
+            onClose={() => setShowMobileAccessoryBar(false)}
+          />
+        </div>
+      )}
+
+      {/* Mobile Ergonomic Navigation Bar for Android / Smartphones (Visible on < lg screens) */}
+      <nav
+        aria-label="Navegação Mobile do Cyberdeck"
+        className="lg:hidden mt-1 pt-1.5 pb-[max(0.35rem,env(safe-area-inset-bottom))] border-t border-zinc-800/90 bg-[#020504]/95 backdrop-blur-md flex items-center justify-around gap-1 shrink-0 z-30 select-none shadow-[0_-4px_16px_rgba(0,0,0,0.7)]"
+      >
+        {/* Tab 1: Terminal */}
+        <button
+          type="button"
+          onClick={() => setMobileTab('terminal')}
+          className={`flex-1 py-1.5 px-2 rounded flex flex-col items-center justify-center gap-0.5 font-mono text-[10px] tracking-wider transition-all cursor-pointer ${
+            mobileTab === 'terminal'
+              ? 'bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.3)] font-bold'
+              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent'
+          }`}
+        >
+          <Terminal className="w-4 h-4 text-emerald-400" />
+          <span>TERMINAL</span>
+        </button>
+
+        {/* Tab 2: Sessões Rápidas */}
+        <button
+          type="button"
+          onClick={() => setMobileTab('sessions')}
+          className={`flex-1 py-1.5 px-2 rounded flex flex-col items-center justify-center gap-0.5 font-mono text-[10px] tracking-wider transition-all cursor-pointer relative ${
+            mobileTab === 'sessions'
+              ? 'bg-cyan-950/70 border border-cyan-500/60 text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.3)] font-bold'
+              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent'
+          }`}
+        >
+          <div className="relative">
+            <Layers className="w-4 h-4 text-cyan-400" />
+            {sessions.length > 0 && (
+              <span className="absolute -top-1 -right-2.5 px-1 min-w-[14px] h-3.5 flex items-center justify-center rounded-full bg-cyan-500 text-black text-[8px] font-bold">
+                {sessions.length}
+              </span>
+            )}
+          </div>
+          <span>SESSÕES</span>
+        </button>
+
+        {/* Tab 3: Logs em Tempo Real */}
+        <button
+          type="button"
+          onClick={() => setMobileTab('logs')}
+          className={`flex-1 py-1.5 px-2 rounded flex flex-col items-center justify-center gap-0.5 font-mono text-[10px] tracking-wider transition-all cursor-pointer relative ${
+            mobileTab === 'logs'
+              ? 'bg-amber-950/70 border border-amber-500/60 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.3)] font-bold'
+              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent'
+          }`}
+        >
+          <div className="relative">
+            <Activity className="w-4 h-4 text-amber-400" />
+            {logs.length > 0 && (
+              <span className="absolute -top-1 -right-2 px-1 min-w-[14px] h-3.5 flex items-center justify-center rounded-full bg-amber-500 text-black text-[8px] font-bold">
+                {logs.length > 99 ? '99+' : logs.length}
+              </span>
+            )}
+          </div>
+          <span>LOGS</span>
+        </button>
+
+        {/* Tab 4: Virtual Keyboard Accessory Toggle */}
+        <button
+          type="button"
+          onClick={() => setShowMobileAccessoryBar((prev) => !prev)}
+          className={`flex-1 py-1.5 px-2 rounded flex flex-col items-center justify-center gap-0.5 font-mono text-[10px] tracking-wider transition-all cursor-pointer ${
+            showMobileAccessoryBar
+              ? 'bg-zinc-800/90 border border-zinc-600 text-emerald-300 font-bold'
+              : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 border border-transparent'
+          }`}
+          title="Alternar barra de teclas auxiliares (ESC, TAB, ^C, Setas)"
+        >
+          <Keyboard className="w-4 h-4 text-current" />
+          <span>TECLAS {showMobileAccessoryBar ? 'ON' : 'OFF'}</span>
+        </button>
+      </nav>
+
       {/* Bottom Hardware Footer */}
-      <footer className="mt-2 pt-1 border-t border-zinc-900 flex flex-wrap items-center justify-between text-[10px] opacity-65 tracking-widest font-mono shrink-0">
+      <footer className="hidden sm:flex mt-2 pt-1 border-t border-zinc-900 flex-wrap items-center justify-between text-[10px] opacity-65 tracking-widest font-mono shrink-0">
         <div>TERMINAL: CROSS-PLATFORM // WIN • LINUX • MAC • ANDROID // ABA: {currentTab.title}</div>
         <div>PROTOCOLS: POWERSHELL • SSH • TELNET • ICMP • RAW TCP</div>
         <div>ABAS ATIVAS: {tabs.length}{isSplitScreen ? ' [SPLIT-SCREEN ATIVO]' : ''}{isBroadcastMode ? ' [SYNC BROADCAST]' : ''}</div>
@@ -2813,7 +3243,7 @@ export default function App() {
   if (crtConfig.mode === 'real') {
     const screenElement = (
       <div
-        className={`crt-real-screen crt-brightness-layer flex-1 flex flex-col min-h-0 w-full h-full relative overflow-hidden p-2 sm:p-3 md:p-4 ${
+        className={`crt-real-screen crt-brightness-layer flex-1 flex flex-col min-h-0 w-full h-full relative overflow-hidden p-1.5 sm:p-3 md:p-4 safe-area-top safe-area-bottom ${
           crtConfig.curvature ? 'crt-barrel-warp' : ''
         } ${isDegaussing ? 'crt-degaussing' : ''}`}
       >
@@ -2845,7 +3275,7 @@ export default function App() {
   // SUBTLE CRT MODE: Scanline overlay on monitor background
   if (crtConfig.mode === 'subtle') {
     return (
-      <div className={`w-full h-screen flex flex-col p-2 sm:p-4 crt-monitor crt-brightness-layer overflow-hidden select-text relative ${isDegaussing ? 'crt-degaussing' : ''}`}>
+      <div className={`w-full h-screen flex flex-col p-1.5 sm:p-4 safe-area-top safe-area-bottom crt-monitor crt-brightness-layer overflow-hidden select-text relative ${isDegaussing ? 'crt-degaussing' : ''}`}>
         <div className="crt-overlay"></div>
         {crtConfig.hertz && (
           <div className="crt-hertz-container" aria-hidden="true">
@@ -2861,7 +3291,7 @@ export default function App() {
 
   // CRT OFF: Clean flat display
   return (
-    <div className={`w-full h-screen flex flex-col p-2 sm:p-4 bg-[#07090b] crt-brightness-layer text-zinc-100 overflow-hidden select-text relative ${isDegaussing ? 'crt-degaussing' : ''}`}>
+    <div className={`w-full h-screen flex flex-col p-1.5 sm:p-4 safe-area-top safe-area-bottom bg-[#07090b] crt-brightness-layer text-zinc-100 overflow-hidden select-text relative ${isDegaussing ? 'crt-degaussing' : ''}`}>
       {isDegaussing && <div className="crt-degauss-flash-overlay" />}
       {appContent}
     </div>

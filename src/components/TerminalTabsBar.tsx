@@ -73,6 +73,10 @@ export const TerminalTabsBar: React.FC<TerminalTabsBarProps> = ({
         return 'bg-cyan-950/40 border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(0,240,255,0.25)]';
       case 'magenta':
         return 'bg-pink-950/40 border-pink-500 text-pink-200 shadow-[0_0_12px_rgba(255,0,119,0.25)]';
+      case 'white':
+        return 'bg-slate-900/50 border-slate-300 text-slate-100 shadow-[0_0_12px_rgba(240,244,248,0.25)]';
+      case 'red':
+        return 'bg-red-950/40 border-red-500 text-red-200 shadow-[0_0_12px_rgba(255,42,59,0.25)]';
       default:
         return 'bg-emerald-950/40 border-emerald-400 text-emerald-300 shadow-[0_0_12px_rgba(0,255,102,0.25)]';
     }

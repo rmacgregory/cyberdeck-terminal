@@ -10,6 +10,10 @@ import {
   Sliders,
   Zap,
   Columns,
+  Battery,
+  BatteryCharging,
+  BatteryMedium,
+  BatteryWarning,
 } from 'lucide-react';
 import {
   TerminalTheme,
@@ -17,6 +21,7 @@ import {
   CrtConfig,
   TypographyConfig,
   SystemMetrics,
+  BatteryStatus,
 } from '../types';
 import { CrtConfigModal } from './CrtConfigModal';
 
@@ -31,6 +36,7 @@ interface HeaderHudProps {
   sessionState: SessionState;
   backendConnected: boolean;
   systemMetrics?: SystemMetrics | null;
+  batteryStatus?: BatteryStatus | null;
   isBrowserOpen?: boolean;
   onToggleBrowser?: () => void;
   onTriggerDegauss?: () => void;
@@ -46,6 +52,8 @@ const THEMES: { id: TerminalTheme; label: string; color: string; dotClass: strin
   { id: 'amber', label: 'AMBER CRT', color: '#ffb000', dotClass: 'bg-amber-400' },
   { id: 'cyan', label: 'NEO CYAN', color: '#00f0ff', dotClass: 'bg-cyan-400' },
   { id: 'magenta', label: 'SYNTHWAVE', color: '#ff0077', dotClass: 'bg-pink-500' },
+  { id: 'white', label: 'MONO WHITE', color: '#f0f4f8', dotClass: 'bg-slate-100' },
+  { id: 'red', label: 'CYBER RED', color: '#ff2a3b', dotClass: 'bg-red-500' },
 ];
 
 export const HeaderHud: React.FC<HeaderHudProps> = ({
@@ -59,6 +67,7 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
   sessionState,
   backendConnected,
   systemMetrics,
+  batteryStatus,
   isBrowserOpen = false,
   onToggleBrowser,
   onTriggerDegauss,
@@ -69,10 +78,47 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
   onToggleMacros,
 }) => {
   const [clock, setClock] = useState<string>('00:00:00');
+  const [internalBattery, setInternalBattery] = useState<BatteryStatus | null>(null);
   const [isCrtMenuOpen, setIsCrtMenuOpen] = useState<boolean>(false);
   const crtMenuRef = useRef<HTMLDivElement>(null);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState<boolean>(false);
   const themeMenuRef = useRef<HTMLDivElement>(null);
+
+  // Fallback battery listener if batteryStatus is not provided from props
+  useEffect(() => {
+    let batteryInstance: any = null;
+    const updateBattery = (b: any) => {
+      setInternalBattery({
+        level: Math.round((b.level ?? 1) * 100),
+        charging: Boolean(b.charging),
+        chargingTime: b.chargingTime,
+        dischargingTime: b.dischargingTime,
+      });
+    };
+
+    if (typeof navigator !== 'undefined' && 'getBattery' in navigator) {
+      (navigator as any).getBattery().then((battery: any) => {
+        batteryInstance = battery;
+        updateBattery(battery);
+
+        battery.addEventListener('levelchange', () => updateBattery(battery));
+        battery.addEventListener('chargingchange', () => updateBattery(battery));
+        battery.addEventListener('chargingtimechange', () => updateBattery(battery));
+        battery.addEventListener('dischargingtimechange', () => updateBattery(battery));
+      }).catch(() => {});
+    }
+
+    return () => {
+      if (batteryInstance) {
+        try {
+          batteryInstance.removeEventListener('levelchange', () => updateBattery(batteryInstance));
+          batteryInstance.removeEventListener('chargingchange', () => updateBattery(batteryInstance));
+        } catch {}
+      }
+    };
+  }, []);
+
+  const activeBattery = batteryStatus !== undefined ? batteryStatus : internalBattery;
 
   useEffect(() => {
     const updateTime = () => {
@@ -113,11 +159,38 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
       {/* Brand & Status */}
       <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
         <div className="flex items-center gap-1.5 font-bold tracking-widest text-sm shrink-0">
-          <Terminal className="w-4 h-4 text-emerald-400" />
-          <span className="crt-glow font-vt323 text-lg">CYBERDECK // UNIVERSAL TERMINAL</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded border border-current opacity-70">
-            HOST: WIN / LINUX / MAC
+          <Terminal className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="crt-glow font-vt323 text-base sm:text-lg">
+            <span className="sm:hidden">CYBERDECK</span>
+            <span className="hidden sm:inline">CYBERDECK // UNIVERSAL TERMINAL</span>
           </span>
+          <span className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded border border-current opacity-70">
+            HOST: WIN • LINUX • MAC • ANDROID
+          </span>
+          <span className="md:hidden text-[9px] px-1 py-0.5 rounded border border-current opacity-70">
+            ANDROID
+          </span>
+          {activeBattery && (
+            <span
+              className={`sm:hidden flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-mono ${
+                activeBattery.charging
+                  ? 'border-emerald-500/50 bg-emerald-950/40 text-emerald-300'
+                  : activeBattery.level <= 20
+                  ? 'border-red-500/70 bg-red-950/50 text-red-300 animate-pulse'
+                  : 'border-zinc-800 bg-zinc-950/60 text-zinc-300'
+              }`}
+              title={`Bateria: ${activeBattery.level}% ${activeBattery.charging ? '(Carregando)' : ''}`}
+            >
+              {activeBattery.charging ? (
+                <BatteryCharging className="w-3 h-3 text-emerald-400" />
+              ) : activeBattery.level <= 20 ? (
+                <BatteryWarning className="w-3 h-3 text-red-400" />
+              ) : (
+                <Battery className="w-3 h-3 text-current" />
+              )}
+              <span>{activeBattery.level}%</span>
+            </span>
+          )}
         </div>
 
         <div className="hidden lg:flex items-center gap-2 pl-4 border-l border-zinc-800 text-[11px] shrink-0">
@@ -142,8 +215,8 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
         </div>
       </div>
 
-      {/* Quick Metrics HUD: CPU & RAM Telemetry */}
-      <div className="hidden md:flex items-center gap-3 sm:gap-4 text-[11px] shrink-0">
+      {/* Quick Metrics HUD: CPU, RAM & Battery Telemetry */}
+      <div className="hidden sm:flex items-center gap-2 sm:gap-3.5 text-[11px] shrink-0">
         <div className="hidden lg:flex items-center gap-1">
           <span className="opacity-60">CPU:</span>
           {systemMetrics ? (
@@ -165,6 +238,50 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
             <span className="font-bold text-zinc-500">--MB</span>
           )}
         </div>
+
+        {/* Battery Status Monitor for Portable Devices & Laptops */}
+        {activeBattery && (
+          <div
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded border transition-all select-none cursor-default ${
+              activeBattery.charging
+                ? 'border-emerald-500/50 bg-emerald-950/40 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.25)]'
+                : activeBattery.level <= 20
+                ? 'border-red-500/70 bg-red-950/60 text-red-300 shadow-[0_0_10px_rgba(239,68,68,0.4)] animate-pulse'
+                : activeBattery.level <= 50
+                ? 'border-amber-500/50 bg-amber-950/40 text-amber-300'
+                : 'border-zinc-800 bg-zinc-950/70 text-zinc-300'
+            }`}
+            title={`BATERIA // SISTEMA DE ENERGIA PORTÁTIL\n• Carga Atual: ${activeBattery.level}%\n• Estado: ${
+              activeBattery.charging
+                ? 'Conectado à Rede Elétrica (Carregando AC / USB-C)'
+                : 'Alimentação por Bateria (Em Descarga)'
+            }${
+              !activeBattery.charging && activeBattery.dischargingTime && activeBattery.dischargingTime !== Infinity
+                ? `\n• Autonomia Estimada: ~${Math.round(activeBattery.dischargingTime / 60)} min`
+                : ''
+            }`}
+          >
+            {activeBattery.charging ? (
+              <BatteryCharging className="w-3.5 h-3.5 text-emerald-400 shrink-0 animate-pulse" />
+            ) : activeBattery.level <= 20 ? (
+              <BatteryWarning className="w-3.5 h-3.5 text-red-400 shrink-0" />
+            ) : activeBattery.level <= 50 ? (
+              <BatteryMedium className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            ) : (
+              <Battery className="w-3.5 h-3.5 text-current shrink-0" />
+            )}
+            <span className="font-bold font-mono text-[11px]">{activeBattery.level}%</span>
+            {activeBattery.charging ? (
+              <span className="flex items-center gap-0.5 text-[9px] text-amber-400 font-bold tracking-wider">
+                <Zap className="w-2.5 h-2.5 fill-amber-400 text-amber-400 animate-bounce" />
+                <span className="hidden xl:inline">AC</span>
+              </span>
+            ) : (
+              <span className="hidden xl:inline text-[9px] opacity-60 font-mono">BAT</span>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center gap-1">
           <span className="opacity-60">SHELL:</span>
           <span className="px-1.5 bg-zinc-900 border border-current rounded text-[10px] font-bold">

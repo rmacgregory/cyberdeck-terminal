@@ -102,27 +102,45 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
 * **Controle Dinâmico de Brilho**: Ajuste fino da luminosidade de 70% a 200% (`brightness <valor>`).
 * **Curvatura do Tubo Regulável**: Distorção esférica ajustável de 0% a 100% (`curve <0-100>`).
 * **Intensidade da Vinheta**: Controle óptico do escurecimento das bordas (`vinheta <0-100|off>`).
-* **Taxa de Piscada do Cursor (Blink Rate)**: Modo fixo/estático (`solid`), lento, normal ou rápido (`cursor <solid|0.5s|turbo>`).
-* **4 Temas de Cores de Fósforo**: 🟢 *Matrix Green*, 🟡 *Amber CRT*, 🔵 *Neo Cyan*, 🟣 *Synthwave Magenta*.
-* **Tipografia Customizável**: *Share Tech Mono*, *VT323 (DEC VT220)*, *Fira Code* e *JetBrains Mono*, com tamanhos e espaçamentos reguláveis.
+* **6 Temas de Cores de Fósforo**:
+  * 🟢 **Matrix Green**: O lendário verde fósforo P1 (#00ff66).
+  * 🟡 **Amber CRT**: Fósforo âmbar clássico de estações industriais (#ffb000).
+  * 🔵 **Neo Cyan**: Azul ciberpunk de alta visibilidade (#00f0ff).
+  * 🟣 **Synthwave Magenta**: Rosa néon retrô (#ff0077).
+  * ⚪ **Mono White**: Fósforo branco monocromático Paper White de alta nitidez (#f0f4f8).
+  * 🔴 **Cyber Red**: Fósforo vermelho tático de combate / visor militar (#ff2a3b).
 
-### 📊 12. Telemetria Real do Sistema (CPU & Memória RAM)
+### 📊 12. Telemetria Real do Sistema (CPU, Memória RAM & Bateria Portátil)
 * **Monitoramento em Tempo Real**: Leitura do consumo real de hardware diretamente via Node.js (`os.cpus()`, `os.totalmem()`, `os.freemem()`).
-* **Exibição no HUD Superior**: Acompanhe o consumo da máquina com métricas de CPU e memória.
+* **Monitor de Status da Bateria (Laptops & Dispositivos Móveis)**: Exibição automática no HUD do percentual de carga, indicador de carregamento AC/USB-C com raio animado e alertas visuais de bateria fraca em dispositivos portáteis via Battery Status API.
+### 📱 13. Ergonomia Mobile & Modo Vertical para Celulares Android
+* **Barra de Navegação Inferior Mobile**: Navegação ergonômica com abas sensíveis ao toque (`TERMINAL`, `SESSÕES`, `LOGS`, `TECLAS AUX`) projetada especialmente para smartphones segurados na vertical.
+* **Barra de Teclas Auxiliares Virtuais (Termux/JuiceSSH Style)**: Trilho de atalhos rápidos essencial para teclados virtuais (Gboard, Samsung Keyboard, etc.):
+  * `ESC`: Limpa o comando atual ou cancela operação.
+  * `TAB ⇥`: Autocompleta comandos e modelos de equipamentos em tempo real.
+  * `^C`: Emite sinal de interrupção imediata (SIGINT) e cancela sessões remotas.
+  * `^L`: Limpa o buffer de tela do terminal.
+  * `↑` / `↓`: Navega pelo histórico persistente de comandos digitados.
+  * `←` / `→`: Move o cursor bloco CRT pelo meio dos caracteres digitados.
+  * Caracteres especiais de shell unix/redes com toque direto: `|`, `/`, `-`, `~`, `\`, `.`, `:`, `"`.
+  * `ENTER`: Envio tático imediato com feedback tátil.
+* **Divisão de Tela Adaptativa (Split Vertical Inteligente)**: No modo vertical/retrato, o Split-Screen assume automaticamente orientação horizontal (telas sobrepostas cima/baixo) para evitar colunas espremidas de 180px.
+* **Compatibilidade Safe Area Android**: Respeito automático aos entalhes de câmera (punch-hole) e à barra de gestos do sistema (`env(safe-area-inset)`).
 
-### 🌐 13. Cyber-Net: Navegador Web CRT Embutido *(ALPHA - Em Testes ⚠️)*
+### 🌐 14. Cyber-Net: Navegador Web CRT Embutido *(ALPHA - Em Testes ⚠️)*
 > ⚠️ **Status Alpha / Experimental**: A função de navegador integrado está em estágio inicial (Alpha). Muitos sites modernos possuem proteções contra incorporação (`X-Frame-Options`, CSP).
 * Navegação web com efeito CRT aplicado em tempo real.
 * Comandos rápidos: `browser <url>` ou `youtube <id_ou_link>`.
 
-### ⚡ 14. Terminal Real & Multi-Shell
+### ⚡ 15. Terminal Real & Multi-Shell
 * Suporte nativo a diferentes interpretadores de comando:
   * **Windows**: PowerShell (`pwsh`) e Prompt de Comando (`cmd.exe`).
   * **Linux / macOS**: Bash (`/bin/bash`), Zsh (`/bin/zsh`) e POSIX Shell (`/bin/sh`).
+  * **Android**: POSIX Sh nativo (`/bin/sh` ou shell Android).
 * Comunicação bidirecional contínua de baixa latência via **WebSockets (porta 3001)**.
 * Histórico de comandos com persistência (`ArrowUp` / `ArrowDown`).
 
-### 📡 15. Protocolos de Rede, Chaves SSH & Autocompletação Inteligente
+### 📡 16. Protocolos de Rede, Chaves SSH & Autocompletação Inteligente
 * **Varredura de Sub-rede ICMP (Ping-Sweep)**: Comando `ping-sweep <sub-rede/CIDR>` (ex: `ping-sweep 192.168.1.0/24`) para mapeamento de dispositivos ativos com IP, RTT, fabricante e MAC.
 * **SSH Integrado com Chaves Privadas (PEM / OpenSSH / RSA / Ed25519)**: Conexão direta por senha ou arquivo de chave (`ssh -i chave.pem usuario@host -p 22`).
 * **Autocompletação por Equipamento (`[TAB]`)**: Detecção inteligente de comandos para Cisco IOS, MikroTik RouterOS, Huawei VRP, Juniper JunOS e servidores Linux/Windows.
@@ -204,10 +222,11 @@ Digite os comandos abaixo diretamente no prompt do Cyberdeck:
 | `help` | Exibe a lista completa de comandos e sintaxe de uso |
 | `[TAB]` | Autocompleta comandos de acordo com o equipamento conectado (Cisco, MikroTik, Linux, etc.) |
 | `systeminfo` | Exibe dados do sistema operacional, host e arquitetura (x64) |
+| `battery` ou `power` | Exibe telemetria de bateria, percentual, estado de carga AC e autonomia |
 | `tab new [nome]` | Abre uma nova aba de terminal para conectar em outro equipamento |
 | `tab close` | Fecha a aba ativa atual |
 | `tab rename <nome>` | Renomeia o título da aba atual |
-| `theme <green\|amber\|cyan\|magenta>` | Altera a cor do fósforo da tela CRT |
+| `theme <green\|amber\|cyan\|magenta\|white\|red>` | Altera a cor do fósforo da tela CRT |
 | `crt <real\|subtle\|off\|bloom\|bezel\|curve>` | Controla os efeitos de tubo, curvatura, bloom e moldura |
 | `brightness <70-200>` | Ajusta a intensidade luminosa de fósforo da tela |
 | `curve <0-100\|off>` | Ajusta o raio de curvatura esférica do tubo CRT |
