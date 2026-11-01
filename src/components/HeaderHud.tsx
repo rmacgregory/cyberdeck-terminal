@@ -15,6 +15,7 @@ import {
   BatteryMedium,
   BatteryWarning,
   Network,
+  Command,
 } from 'lucide-react';
 import {
   TerminalTheme,
@@ -47,6 +48,7 @@ interface HeaderHudProps {
   isMacrosOpen?: boolean;
   onToggleMacros?: () => void;
   onOpenTopology?: () => void;
+  onOpenCommandPalette?: () => void;
 }
 
 const THEMES: { id: TerminalTheme; label: string; color: string; dotClass: string }[] = [
@@ -79,6 +81,7 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
   isMacrosOpen = false,
   onToggleMacros,
   onOpenTopology,
+  onOpenCommandPalette,
 }) => {
   const [clock, setClock] = useState<string>('00:00:00');
   const [internalBattery, setInternalBattery] = useState<BatteryStatus | null>(null);
@@ -377,6 +380,22 @@ export const HeaderHud: React.FC<HeaderHudProps> = ({
           >
             <Network className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
             <span className="tracking-wider">MAPA D3</span>
+          </button>
+        )}
+
+        {/* Command Palette Button (Ctrl+Shift+P) */}
+        {onOpenCommandPalette && (
+          <button
+            type="button"
+            onClick={onOpenCommandPalette}
+            title="Abrir Paleta Rápida de Comandos (Ctrl+Shift+P)"
+            className="px-2.5 py-1 rounded border border-emerald-500/60 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.3)] text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+          >
+            <Command className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">COMANDOS</span>
+            <span className="px-1 py-0.2 rounded text-[8.5px] bg-black/60 border border-emerald-500/40 text-emerald-400 hidden xl:inline">
+              Ctrl+Shift+P
+            </span>
           </button>
         )}
 

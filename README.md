@@ -115,7 +115,7 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
 * **Monitor de Status da Bateria (Laptops & Dispositivos Móveis)**: Exibição automática no HUD do percentual de carga, indicador de carregamento AC/USB-C com raio animado e alertas visuais de bateria fraca em dispositivos portáteis via Battery Status API.
 ### 📱 13. Ergonomia Mobile & Modo Vertical para Celulares Android
 * **Barra de Navegação Inferior Mobile**: Navegação ergonômica com abas sensíveis ao toque (`TERMINAL`, `SESSÕES`, `LOGS`, `TECLAS AUX`) projetada especialmente para smartphones segurados na vertical.
-* **Barra de Teclas Auxiliares Virtuais (Termux/JuiceSSH Style)**: Trilho de atalhos rápidos essencial para teclados virtuais (Gboard, Samsung Keyboard, etc.):
+* **Barra de Teclas Auxiliares Virtuais (Exclusiva para Android - Termux/JuiceSSH Style)**: Trilho de atalhos rápidos essencial para teclados virtuais touch (Gboard, Samsung Keyboard, etc.), ativo e visível exclusivamente na versão Android (oculto no Windows, macOS, Linux e desktop web):
   * `ESC`: Limpa o comando atual ou cancela operação.
   * `TAB ⇥`: Autocompleta comandos e modelos de equipamentos em tempo real.
   * `^C`: Emite sinal de interrupção imediata (SIGINT) e cancela sessões remotas.
@@ -152,7 +152,24 @@ Disponível como **aplicativo desktop nativo de 64 bits** (Windows, Linux e macO
 * **Telnet & Raw TCP Socket**: Conexões diretas de socket com dispositivos de rede legados (`telnet host porta`).
 * **Ping / ICMP Real**: Testes de alcance de pacotes e latência em milissegundos.
 * **Painel de Acessos Rápidos (Quick Sessions)**: Salve conexões frequentes com IP, porta, credenciais e abertura na aba atual ou em nova aba.
-* **Auditoria de Logs em Tempo Real**: Telemetria detalhada de eventos de rede, pacotes e conexões com filtros por severidade (`INFO`, `WARN`, `ERROR`, `DATA`, `SUCCESS`).
+### ⚡ 17. Paleta de Comandos Rápida Estilo Command Palette (`Ctrl + Shift + P` / `palette`)
+* **Acesso Instantâneo e Busca Filtrada**: Pressione `Ctrl + Shift + P` (ou `Cmd + Shift + P` no macOS) em qualquer lugar da aplicação para abrir a Paleta de Comandos rápida estilo VS Code / Sublime Text.
+* **Catálogo Completo Categorizado**: Lista mais de 35 comandos disponíveis no terminal com títulos, argumentos e breves descrições em português, organizados por categorias:
+  * 🌐 **Rede & Diagnóstico**: `ping-sweep`, `topology`, `nmap`, `traceroute`, `ping`, `ssh`, `telnet`.
+  * 📑 **Sessão & Abas**: `tab new`, `tab close`, `tab rename`, `split`, `broadcast`.
+  * 📺 **Monitor CRT**: Modos CRT Real/Leve/Off, `degauss`, `hertz`, `curve`, `vinheta`, `jitter`, `cursor`, `brightness`, temas de fósforo.
+  * 🛠️ **Utilitários**: `htop`, `nano`, `export`, `sidebar`, `macros`, `clear`.
+  * 🐚 **Interpretadores**: `powershell`, `cmd`, `bash`, `zsh`, `sh`.
+  * 💻 **Sistema**: `systeminfo`, `battery`, `help`.
+* **Navegação & Execução Imediata**:
+  * Filtre em tempo real digitando qualquer termo ou clicando nas pílulas de categoria.
+  * Navegue com as setas `↑` e `↓` do teclado.
+  * Pressione `Enter` ou clique no comando desejado para despachá-lo imediatamente no terminal da aba ativa.
+* **Gatilhos Visuais & Suporte a Terminal**:
+  * Botão **`COMANDOS [Ctrl+Shift+P]`** no HUD superior.
+  * Botão **`PALETA [Ctrl+Shift+P]`** na fita de macros rápidas.
+  * Botão tátil **`CMD`** no trilho de teclas da barra virtual mobile.
+  * Comandos de terminal: `commands`, `palette`, `paleta`, `comandos`.
 
 ---
 
@@ -211,6 +228,7 @@ Digite os comandos abaixo diretamente no prompt do Cyberdeck:
 
 | Comando / Atalho | Descrição |
 | :--- | :--- |
+| `commands` ou `palette` | Abre a Paleta de Comandos rápida estilo VS Code com busca e execução imediata |
 | `split [-h\|-v]` | Ativa/desativa divisão de tela (horizontal `-h` ou vertical `-v`) |
 | `broadcast <on\|off>` ou `sync` | Liga/desliga modo sincronizado de digitação simultânea em ambos os terminais |
 | `htop` ou `top` | Abre o monitor interativo de processos e CPU estilo HTOP CRT |
@@ -220,6 +238,7 @@ Digite os comandos abaixo diretamente no prompt do Cyberdeck:
 | `nmap <host>` ou `scanport <host>` | Executa varredura de portas TCP no host indicado |
 | `traceroute <host>` ou `tracert <host>` | Traça a rota de pacotes e saltos de rede até o host de destino |
 | `ping-sweep <subrede/CIDR>` | Mapeia todos os hosts e equipamentos ativos na sub-rede (ex: `192.168.1.0/24`) |
+| `topology` ou `map` | Abre o mapa visual interativo em D3.js com a topologia dos hosts descobertos |
 | `export` ou `savelog` | Exporta e baixa o histórico completo da sessão em arquivo `.log` |
 | `degauss` | Dispara o efeito de desmagnetização analógica da bobina do tubo CRT |
 | `macros` | Exibe ou oculta a barra de botões e macros rápidas de rede |
@@ -253,6 +272,7 @@ Digite os comandos abaixo diretamente no prompt do Cyberdeck:
 
 | Atalho | Ação |
 | :--- | :--- |
+| `Ctrl + Shift + P` / `Cmd + Shift + P` | Abre a Paleta de Comandos rápida com busca instantânea e execução direta |
 | `Alt + B` | Recolhe / expande ambos os painéis laterais (área máxima para o terminal) |
 | `Alt + ←` ou `Alt + ↑` | Alterna o foco para o **Painel 1** no modo Split-Screen |
 | `Alt + →` ou `Alt + ↓` / `Alt + P` | Alterna o foco para o **Painel 2** no modo Split-Screen |

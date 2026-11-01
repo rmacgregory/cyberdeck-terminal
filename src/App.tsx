@@ -37,6 +37,7 @@ import { NanoEditorModal } from './components/NanoEditorModal';
 import { QuickMacrosBar } from './components/QuickMacrosBar';
 import { MobileAccessoryBar } from './components/MobileAccessoryBar';
 import { NetworkTopologyModal } from './components/NetworkTopologyModal';
+import { CommandPaletteModal } from './components/CommandPaletteModal';
 import {
   executePortScan,
   executeTraceroute,
@@ -175,6 +176,23 @@ export default function App() {
     if (typeof window !== 'undefined' && (window as any).cyberdeckDesktop?.platform) {
       return (window as any).cyberdeckDesktop.platform;
     }
+    // Query param or localStorage override for platform testing (e.g., ?platform=android)
+    if (typeof window !== 'undefined') {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const p = urlParams.get('platform');
+        if (p) return p.toLowerCase();
+        const stored = localStorage.getItem('CYBERDECK_PLATFORM');
+        if (stored) return stored.toLowerCase();
+      } catch {}
+    }
+    // Capacitor native Android detection
+    try {
+      if (typeof window !== 'undefined' && (window as any).Capacitor?.getPlatform) {
+        const capPlatform = (window as any).Capacitor.getPlatform();
+        if (capPlatform === 'android') return 'android';
+      }
+    } catch {}
     if (typeof navigator !== 'undefined') {
       const ua = navigator.userAgent.toLowerCase();
       if (ua.includes('android')) return 'android';
@@ -184,6 +202,11 @@ export default function App() {
     }
     return 'win32';
   });
+
+  const isAndroid =
+    detectedPlatform === 'android' ||
+    (typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent)) ||
+    (typeof window !== 'undefined' && (window as any).Capacitor?.getPlatform?.() === 'android');
 
   // Mobile & Portrait Orientation State for Smartphones and Handheld Cyberdecks
   const [isMobileView, setIsMobileView] = useState<boolean>(() => {
@@ -200,7 +223,10 @@ export default function App() {
     return false;
   });
 
-  const [showMobileAccessoryBar, setShowMobileAccessoryBar] = useState<boolean>(true);
+  // Teclas rápidas (barra de atalhos virtuais) devem aparecer única e exclusivamente na versão de Android
+  const [showMobileAccessoryBar, setShowMobileAccessoryBar] = useState<boolean>(() => {
+    return isAndroid;
+  });
 
   const defaultShell = (() => {
     if (typeof window !== 'undefined' && (window as any).cyberdeckDesktop?.platform === 'darwin') return 'zsh';
@@ -343,6 +369,13 @@ export default function App() {
       setTopologyData(generatePingSweepTopology('192.168.1.0/24'));
     }
     setIsTopologyOpen(true);
+  };
+
+  // COMMAND PALETTE STATE (Ctrl+Shift+P)
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+
+  const handleOpenCommandPalette = () => {
+    setIsCommandPaletteOpen(true);
   };
 
   const getVfsFiles = (): Record<string, string> => {
@@ -821,6 +854,12 @@ export default function App() {
           e.preventDefault();
           handleSelectTab(leftTab.id);
         }
+      }
+      // Ctrl + Shift + P (or Cmd + Shift + P on macOS) -> Command Palette
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsCommandPaletteOpen((prev) => !prev);
       }
       // Alt + Seta Direita / Baixo ou Alt + P -> Focar Painel 2 no Split
       if (e.altKey && (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key.toLowerCase() === 'p')) {
@@ -1324,6 +1363,13 @@ export default function App() {
 
     if (cmd === 'help' || cmd === 'ajuda' || cmd === '?') {
       printHelp();
+      return;
+    }
+
+    if (cmd === 'commands' || cmd === 'palette' || cmd === 'paleta' || cmd === 'comandos') {
+      handleOpenCommandPalette();
+      appendLineToTab(tabId, '[*] Paleta de Comandos aberta [Ctrl+Shift+P]...', 'info');
+      addLog('INFO', 'GUI', 'Paleta de Comandos acionada via terminal');
       return;
     }
 
@@ -2383,6 +2429,11 @@ export default function App() {
     appendLine(`• sidebar                  : Recolhe ou expande os dois painéis laterais juntos.`, 'stdout');
     appendLine(`• macros                   : Exibe ou oculta a barra de botões de macros rápidas.`, 'stdout');
     appendLine(``, 'stdout');
+    appendLine(`PALETA DE COMANDOS RÁPIDA:`, 'warning');
+    appendLine(`• commands / palette / paleta: Abre a Paleta de Comandos estilo VS Code [Ctrl+Shift+P].`, 'stdout');
+    appendLine(`• Filtro instantâneo       : Digite para buscar comandos por nome, descrição ou categoria.`, 'stdout');
+    appendLine(`• Execução imediata        : Pressione Enter ou clique para despachar direto no terminal ativo.`, 'success');
+    appendLine(``, 'stdout');
     appendLine(`ATALHOS DE TECLADO:`, 'warning');
     appendLine(`• Alt + B                  : Recolhe / expande os painéis laterais (Maximiza o terminal).`, 'stdout');
     appendLine(`• Alt + ← / ↑ / → / ↓      : Alterna o foco entre os terminais do Split-Screen.`, 'stdout');
@@ -2514,6 +2565,10 @@ export default function App() {
       setTabs((prev) =>
         prev.map((t) => (t.id === tabId ? { ...t, lines: [] } : t))
       );
+    } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsCommandPaletteOpen((prev) => !prev);
     }
   };
 
@@ -2746,6 +2801,7 @@ export default function App() {
         isMacrosOpen={isMacrosOpen}
         onToggleMacros={() => setIsMacrosOpen((prev) => !prev)}
         onOpenTopology={() => handleOpenTopology()}
+        onOpenCommandPalette={handleOpenCommandPalette}
       />
 
       {/* Terminal Multi-Tabs Bar */}
@@ -2773,6 +2829,7 @@ export default function App() {
             onToggleSplitLayout={() => setSplitOrientation((prev) => (prev === 'vertical' ? 'horizontal' : 'vertical'))}
             splitOrientation={splitOrientation}
             onOpenTopology={() => handleOpenTopology()}
+            onOpenCommandPalette={handleOpenCommandPalette}
           />
         </div>
       )}
@@ -2822,7 +2879,7 @@ export default function App() {
       </div>
 
       {/* Center Body: Terminal Workspace with Inline Typing + Right Sidebar */}
-      <div className="relative flex-1 flex flex-col lg:flex-row gap-2 min-h-0 mt-1">
+      <div className="relative flex-1 flex flex-col lg:flex-row gap-2 min-h-0 mt-1 overflow-hidden">
         {/* Main Terminal Screen or Split-Screen Dual Panes */}
         <div className={`flex-1 flex flex-col min-h-0 ${mobileTab === 'terminal' ? 'flex' : 'hidden lg:flex'}`}>
           {isSplitScreen && rightTab ? (
@@ -3090,12 +3147,12 @@ export default function App() {
         {/* Sidebar: Quick Sessions + Real-Time Connection Logs */}
         {!isSidebarCollapsed && (
           <aside
-            className={`w-full lg:w-80 flex-col gap-3 shrink-0 min-h-0 ${
+            className={`w-full lg:w-80 flex-col gap-2.5 shrink-0 min-h-0 h-full max-h-full overflow-hidden ${
               mobileTab === 'terminal' ? 'hidden lg:flex' : 'flex flex-1'
             }`}
           >
             {/* Quick Sessions Panel */}
-            <div className={`${mobileTab === 'sessions' ? 'flex flex-col flex-1 min-h-0' : mobileTab === 'logs' ? 'hidden lg:block' : 'block'}`}>
+            <div className={`shrink-0 ${mobileTab === 'sessions' ? 'flex flex-col flex-1 min-h-0' : mobileTab === 'logs' ? 'hidden lg:block' : 'block'}`}>
               {/* Back to terminal button on mobile */}
               <div className="lg:hidden mb-2">
                 <button
@@ -3117,7 +3174,7 @@ export default function App() {
             </div>
 
             {/* Real-time Connection Log */}
-            <div className={`${mobileTab === 'logs' ? 'flex flex-col flex-1 min-h-0' : mobileTab === 'sessions' ? 'hidden lg:flex lg:flex-1' : 'flex flex-col flex-1'}`}>
+            <div className={`flex-1 flex flex-col min-h-0 overflow-hidden ${mobileTab === 'logs' ? 'flex flex-col flex-1 min-h-0' : mobileTab === 'sessions' ? 'hidden lg:flex lg:flex-1 lg:min-h-0' : 'flex flex-col flex-1 min-h-0'}`}>
               {/* Back to terminal button on mobile */}
               <div className="lg:hidden mb-2">
                 <button
@@ -3135,8 +3192,8 @@ export default function App() {
         )}
       </div>
 
-      {/* Virtual Terminal Accessory Bar (Key Rail for Android / Mobile Soft Keyboards) */}
-      {showMobileAccessoryBar && mobileTab === 'terminal' && (
+      {/* Virtual Terminal Accessory Bar (Key Rail ONLY for Android / Mobile Soft Keyboards) */}
+      {isAndroid && showMobileAccessoryBar && mobileTab === 'terminal' && (
         <div className="mt-1">
           <MobileAccessoryBar
             onInsertChar={handleVirtualInsertChar}
@@ -3149,6 +3206,7 @@ export default function App() {
             onCtrlC={handleVirtualCtrlC}
             onCtrlL={handleVirtualCtrlL}
             onEnter={handleVirtualEnter}
+            onOpenCommandPalette={handleOpenCommandPalette}
             onClose={() => setShowMobileAccessoryBar(false)}
           />
         </div>
@@ -3215,24 +3273,26 @@ export default function App() {
           <span>LOGS</span>
         </button>
 
-        {/* Tab 4: Virtual Keyboard Accessory Toggle */}
-        <button
-          type="button"
-          onClick={() => setShowMobileAccessoryBar((prev) => !prev)}
-          className={`flex-1 py-1.5 px-2 rounded flex flex-col items-center justify-center gap-0.5 font-mono text-[10px] tracking-wider transition-all cursor-pointer ${
-            showMobileAccessoryBar
-              ? 'bg-zinc-800/90 border border-zinc-600 text-emerald-300 font-bold'
-              : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 border border-transparent'
-          }`}
-          title="Alternar barra de teclas auxiliares (ESC, TAB, ^C, Setas)"
-        >
-          <Keyboard className="w-4 h-4 text-current" />
-          <span>TECLAS {showMobileAccessoryBar ? 'ON' : 'OFF'}</span>
-        </button>
+        {/* Tab 4: Virtual Keyboard Accessory Toggle (Exclusivo Android) */}
+        {isAndroid && (
+          <button
+            type="button"
+            onClick={() => setShowMobileAccessoryBar((prev) => !prev)}
+            className={`flex-1 py-1.5 px-2 rounded flex flex-col items-center justify-center gap-0.5 font-mono text-[10px] tracking-wider transition-all cursor-pointer ${
+              showMobileAccessoryBar
+                ? 'bg-zinc-800/90 border border-zinc-600 text-emerald-300 font-bold'
+                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 border border-transparent'
+            }`}
+            title="Alternar barra de teclas auxiliares (ESC, TAB, ^C, Setas)"
+          >
+            <Keyboard className="w-4 h-4 text-current" />
+            <span>TECLAS {showMobileAccessoryBar ? 'ON' : 'OFF'}</span>
+          </button>
+        )}
       </nav>
 
       {/* Bottom Hardware Footer */}
-      <footer className="hidden sm:flex mt-2 pt-1 border-t border-zinc-900 flex-wrap items-center justify-between text-[10px] opacity-65 tracking-widest font-mono shrink-0">
+      <footer className="hidden sm:flex mt-1.5 pt-1 border-t border-zinc-900 flex-wrap items-center justify-between text-[10px] opacity-65 tracking-widest font-mono shrink-0 select-none bg-[#030605]/80 backdrop-blur-sm relative z-10">
         <div>TERMINAL: CROSS-PLATFORM // WIN • LINUX • MAC • ANDROID // ABA: {currentTab.title}</div>
         <div>PROTOCOLS: POWERSHELL • SSH • TELNET • ICMP • RAW TCP</div>
         <div>ABAS ATIVAS: {tabs.length}{isSplitScreen ? ' [SPLIT-SCREEN ATIVO]' : ''}{isBroadcastMode ? ' [SYNC BROADCAST]' : ''}</div>
@@ -3287,6 +3347,14 @@ export default function App() {
             executeCommandLine(`ping ${node.ip}`);
           }
         }}
+      />
+
+      {/* Command Palette Modal (Ctrl+Shift+P) */}
+      <CommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onExecuteCommand={(cmd) => executeCommandLine(cmd)}
+        theme={theme}
       />
     </div>
   );

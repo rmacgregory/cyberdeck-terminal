@@ -34,14 +34,14 @@ export const QuickSessionsPanel: React.FC<QuickSessionsPanelProps> = ({
 
   return (
     <div className="border crt-glow-box p-3 rounded bg-black/60 text-xs flex flex-col gap-2.5">
-      <div className="font-bold border-b border-zinc-800 pb-1.5 flex items-center justify-between text-xs tracking-wider">
+      <div className="font-bold border-b border-zinc-800 pb-1.5 flex items-center justify-between text-xs tracking-wider shrink-0">
         <div className="flex items-center gap-1.5">
           <Layers className="w-3.5 h-3.5 opacity-70" />
           <span>SESSÕES RÁPIDAS</span>
         </div>
         <button
           onClick={onOpenAddModal}
-          className="px-2 py-0.5 rounded border border-current hover:bg-emerald-950/40 crt-glow-box text-[10px] font-bold flex items-center gap-1 transition-colors"
+          className="px-2 py-0.5 rounded border border-current hover:bg-emerald-950/40 crt-glow-box text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
           title="Cadastrar Host, IP e Protocolo"
         >
           <Plus className="w-3 h-3" />
@@ -49,7 +49,7 @@ export const QuickSessionsPanel: React.FC<QuickSessionsPanelProps> = ({
         </button>
       </div>
 
-      <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto cyber-scrollbar pr-1">
+      <div className="flex flex-col gap-1.5 max-h-40 sm:max-h-48 overflow-y-auto cyber-scrollbar pr-1">
         {sessions.length === 0 ? (
           <div className="p-3 text-center border border-dashed border-zinc-800/80 rounded text-[11px] text-zinc-500 flex flex-col items-center gap-1">
             <Terminal className="w-4 h-4 opacity-40 text-emerald-400" />

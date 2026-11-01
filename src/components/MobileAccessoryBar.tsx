@@ -7,6 +7,7 @@ import {
   ChevronDown,
   X,
   RotateCcw,
+  Command,
 } from 'lucide-react';
 
 interface MobileAccessoryBarProps {
@@ -21,6 +22,7 @@ interface MobileAccessoryBarProps {
   onCtrlL: () => void;
   onEnter: () => void;
   onClose?: () => void;
+  onOpenCommandPalette?: () => void;
 }
 
 export const MobileAccessoryBar: React.FC<MobileAccessoryBarProps> = ({
@@ -35,11 +37,25 @@ export const MobileAccessoryBar: React.FC<MobileAccessoryBarProps> = ({
   onCtrlL,
   onEnter,
   onClose,
+  onOpenCommandPalette,
 }) => {
   return (
     <div className="w-full bg-[#030605]/95 border-t border-zinc-800 px-2 py-1.5 flex items-center justify-between gap-1 select-none backdrop-blur-md z-30 shrink-0 shadow-[0_-4px_16px_rgba(0,0,0,0.6)]">
       {/* Scrollable Key Rail */}
       <div className="flex items-center gap-1.5 overflow-x-auto cyber-scrollbar flex-1 py-0.5 pr-1 touch-pan-x">
+        {/* Command Palette Button */}
+        {onOpenCommandPalette && (
+          <button
+            type="button"
+            onClick={onOpenCommandPalette}
+            className="h-8 px-2 rounded bg-cyan-950/80 border border-cyan-500/50 active:bg-cyan-800 text-cyan-300 font-mono text-xs font-bold shrink-0 transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+            title="Abrir Paleta de Comandos (Ctrl+Shift+P)"
+          >
+            <Command className="w-3.5 h-3.5" />
+            <span>CMD</span>
+          </button>
+        )}
+
         {/* ESC Key */}
         <button
           type="button"

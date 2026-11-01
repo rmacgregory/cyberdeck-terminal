@@ -10,6 +10,7 @@ import {
   Trash2,
   Copy,
   Split,
+  Command,
 } from 'lucide-react';
 
 interface QuickMacrosBarProps {
@@ -23,6 +24,7 @@ interface QuickMacrosBarProps {
   onToggleSplitLayout: () => void;
   splitOrientation: 'vertical' | 'horizontal';
   onOpenTopology?: () => void;
+  onOpenCommandPalette?: () => void;
 }
 
 export const QuickMacrosBar: React.FC<QuickMacrosBarProps> = ({
@@ -36,6 +38,7 @@ export const QuickMacrosBar: React.FC<QuickMacrosBarProps> = ({
   onToggleSplitLayout,
   splitOrientation,
   onOpenTopology,
+  onOpenCommandPalette,
 }) => {
   return (
     <div className="flex items-center gap-1.5 px-2 py-1 bg-black/60 border border-zinc-800/80 rounded font-mono text-[10px] overflow-x-auto cyber-scrollbar shrink-0 select-none">
@@ -43,6 +46,18 @@ export const QuickMacrosBar: React.FC<QuickMacrosBarProps> = ({
         <Radio className="w-3 h-3 text-cyan-400" />
         MACROS:
       </span>
+
+      {/* Command Palette Button */}
+      {onOpenCommandPalette && (
+        <button
+          onClick={onOpenCommandPalette}
+          className="px-2 py-0.5 rounded bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/60 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.3)] flex items-center gap-1 shrink-0 transition-colors cursor-pointer font-bold"
+          title="Abrir Paleta de Comandos (Ctrl+Shift+P)"
+        >
+          <Command className="w-3 h-3 text-emerald-400" />
+          PALETA [Ctrl+Shift+P]
+        </button>
+      )}
 
       {/* Ping Gateway */}
       <button

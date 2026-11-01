@@ -45,14 +45,14 @@ export const ConnectionLogsPanel: React.FC<ConnectionLogsPanelProps> = ({ logs, 
   };
 
   return (
-    <div className="border crt-glow-box p-3 rounded bg-black/60 text-xs flex-1 flex flex-col min-h-0">
+    <div className="border crt-glow-box p-2.5 sm:p-3 rounded bg-black/60 text-xs flex-1 flex flex-col min-h-0 h-full max-h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-zinc-800 pb-2 mb-2">
-        <div className="flex items-center gap-1.5 font-bold tracking-wider text-[11px]">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>LOG DE CONEXÃO // TEMPO REAL</span>
+      <div className="flex items-center justify-between border-b border-zinc-800 pb-1.5 mb-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 font-bold tracking-wider text-[11px] truncate">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+          <span className="truncate">LOG DE CONEXÃO // TEMPO REAL</span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => setAutoScroll(!autoScroll)}
             title={autoScroll ? 'Pausar auto-scroll' : 'Ativar auto-scroll'}
@@ -73,7 +73,7 @@ export const ConnectionLogsPanel: React.FC<ConnectionLogsPanelProps> = ({ logs, 
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-1 mb-2 text-[10px] font-mono">
+      <div className="flex items-center gap-1 mb-1.5 text-[10px] font-mono shrink-0 flex-wrap">
         <button
           onClick={() => setFilter('ALL')}
           className={`px-2 py-0.5 rounded border transition-colors ${
@@ -119,7 +119,7 @@ export const ConnectionLogsPanel: React.FC<ConnectionLogsPanelProps> = ({ logs, 
       {/* Log Feed */}
       <div
         ref={logContainerRef}
-        className="flex-1 overflow-y-auto space-y-1.5 cyber-scrollbar pr-1 font-mono text-[10px] min-h-[140px]"
+        className="flex-1 overflow-y-auto space-y-1.5 cyber-scrollbar pr-1 font-mono text-[10px] min-h-0"
       >
         {filteredLogs.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center text-zinc-600 p-4">
@@ -144,7 +144,7 @@ export const ConnectionLogsPanel: React.FC<ConnectionLogsPanelProps> = ({ logs, 
         )}
       </div>
 
-      <div className="mt-2 pt-1 border-t border-zinc-900 text-[9px] text-zinc-500 flex justify-between">
+      <div className="mt-1.5 pt-1 border-t border-zinc-900 text-[9px] text-zinc-500 flex justify-between shrink-0">
         <span>STATUS: MONITOR ATIVO</span>
         <span>EVENTS: {logs.length}</span>
       </div>
